@@ -83,8 +83,8 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
 
     @ReactMethod
     fun requestDirectoryAccess(promise: Promise) {
-        val currentActivity = currentActivity
-        if (currentActivity == null) {
+        val activity = currentActivity
+        if (activity == null) {
             promise.reject("ACTIVITY_DOES_NOT_EXIST", "Activity doesn't exist")
             return
         }
@@ -93,14 +93,14 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-            currentActivity.startActivityForResult(intent, DIRECTORY_PICKER_REQUEST_CODE)
+            activity.startActivityForResult(intent, DIRECTORY_PICKER_REQUEST_CODE)
         } catch (e: Exception) {
             directoryPickerPromise?.reject("INTENT_FAILED", e.message)
             directoryPickerPromise = null
         }
     }
 
-    override fun onActivityResult(activity: Activity?, requestCode: Int, resultCode: Int, data: Intent?) {
+    override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == DIRECTORY_PICKER_REQUEST_CODE) {
             if (resultCode == Activity.RESULT_OK && data != null) {
                 val uri = data.data
@@ -122,7 +122,7 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
         }
     }
 
-    override fun onNewIntent(intent: Intent?) {}
+    override fun onNewIntent(intent: Intent) {}
 
     @ReactMethod
     fun scanDirectory(treeUriString: String, category: String, promise: Promise) {
