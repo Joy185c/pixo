@@ -1,0 +1,38 @@
+# Pixo Backend — Render.com Deployment Config
+# Place this at the root of the pixo/backend folder.
+
+services:
+  - type: web
+    name: pixo-backend
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node src/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        sync: false        # Set this in Render dashboard from Supabase
+      - key: JWT_SECRET
+        generateValue: true
+      - key: BCRYPT_ROUNDS
+        value: 12
+      - key: DEFAULT_MAX_DEVICES
+        value: 50
+      - key: INVITE_LINK_TTL_HOURS
+        value: 720
+      - key: SESSION_TTL_HOURS
+        value: 4320
+      - key: RATE_LIMIT_ACCESS_CODE_MAX
+        value: 10
+      - key: RATE_LIMIT_LINK_CREATE_MAX
+        value: 20
+      - key: SUPABASE_URL
+        sync: false        # Set in Render dashboard
+      - key: SUPABASE_ANON_KEY
+        sync: false        # Set in Render dashboard
+    healthCheckPath: /health

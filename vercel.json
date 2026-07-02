@@ -1,0 +1,26 @@
+{
+  "name": "pixo-dashboard",
+  "version": 2,
+  "builds": [
+    {
+      "src": "dashboard/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/connect/(.*)",
+      "dest": "/dashboard/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/dashboard/$1"
+    }
+  ],
+  "env": {
+    "VITE_API_BASE_URL": "https://pixo-backend.onrender.com/api"
+  }
+}
