@@ -10,12 +10,31 @@ const sessionRoutes       = require('./routes/sessions');
 const dashboardRoutes     = require('./routes/dashboard');
 const appRoutes           = require('./routes/app');
 
+const ALLOWED_ORIGINS = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://pixo-web.vercel.app',
+    process.env.FRONTEND_URL,
+].filter(Boolean);
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, curl, Render health checks)
+        if (!origin) return callback(null, true);
+        if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+        // Allow any *.vercel.app or *.netlify.app preview deploy
+        if (/\.(vercel|netlify)\.app$/.test(origin)) return callback(null, true);
+        callback(new Error(`CORS: ${origin} not allowed`));
+    },
+    credentials: true,
+};
+
 const app  = express();
 const PORT = process.env.PORT || 4000;
 
 // ── Global middleware ────────────────────────────────────────
 app.use(helmet());
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '500mb' }));
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
 

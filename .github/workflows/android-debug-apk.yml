@@ -10,6 +10,9 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
 
+    env:
+      NODE_OPTIONS: "--max_old_space_size=4096"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,10 +35,11 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Configure Gradle and Node Memory
+      - name: Configure Gradle memory
         run: |
-          echo "org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m" >> ./PixoMobile/android/gradle.properties
-          export NODE_OPTIONS="--max_old_space_size=4096"
+          echo "org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError" >> ./PixoMobile/android/gradle.properties
+          echo "org.gradle.daemon=false" >> ./PixoMobile/android/gradle.properties
+          echo "org.gradle.parallel=false" >> ./PixoMobile/android/gradle.properties
 
       - name: Make gradlew executable
         working-directory: ./PixoMobile/android
@@ -43,10 +47,11 @@ jobs:
 
       - name: Build Android Debug APK
         working-directory: ./PixoMobile/android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: pixo-debug-apk
           path: PixoMobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

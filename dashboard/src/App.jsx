@@ -117,7 +117,7 @@ export default function App() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
             <Wifi size={11} style={{ color: 'var(--green)' }} />
-            <span>localhost:4000</span>
+            <span style={{ fontSize: 10, wordBreak: 'break-all' }}>pixo-5l0v.onrender.com</span>
           </div>
         </div>
       </aside>

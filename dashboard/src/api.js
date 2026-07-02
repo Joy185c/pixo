@@ -1,5 +1,5 @@
 // In dev: requests go to /api and Vite proxies them to localhost:4000
-// In production (Vercel): VITE_API_BASE_URL points to https://pixo-backend.onrender.com/api
+// In production (Netlify/Vercel): VITE_API_BASE_URL points to https://pixo-5l0v.onrender.com/api
 const BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export const api = {
