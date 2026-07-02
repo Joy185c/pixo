@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { ErrorInfo, Component } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -27,32 +28,77 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+class ErrorBoundary extends Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Pixo app loaded but hit a runtime error:</Text>
+          <Text style={styles.errorDetails}>{this.state.error?.toString()}</Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App(): React.JSX.Element {
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator 
-          initialRouteName="Splash"
-          screenOptions={{
-            headerStyle: { backgroundColor: '#0A0A14' },
-            headerTintColor: '#fff',
-            headerTitleStyle: { fontWeight: 'bold' },
-            contentStyle: { backgroundColor: '#0A0A14' }
-          }}
-        >
-          <Stack.Screen name="Splash" component={SplashScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Pixo', headerBackVisible: false }} />
-          <Stack.Screen name="ManualInviteCode" component={ManualInviteCodeScreen} options={{ title: 'Enter Invite Code' }} />
-          <Stack.Screen name="Permission" component={PermissionScreen} options={{ title: 'Permissions' }} />
-          <Stack.Screen name="FilePicker" component={FilePickerScreen} options={{ title: 'Select Files' }} />
-          <Stack.Screen name="SelectedFilesReview" component={SelectedFilesReviewScreen} options={{ title: 'Review Selection' }} />
-          <Stack.Screen name="ActiveSession" component={ActiveSessionScreen} options={{ title: 'Active Session', headerBackVisible: false }} />
-          <Stack.Screen name="AccessHistory" component={AccessHistoryScreen} options={{ title: 'Access History' }} />
-          <Stack.Screen name="Error" component={ErrorScreen} options={{ title: 'Error', headerBackVisible: false }} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <ErrorBoundary>
+        <NavigationContainer>
+          <Stack.Navigator 
+            initialRouteName="Splash"
+            screenOptions={{
+              headerStyle: { backgroundColor: '#0A0A14' },
+              headerTintColor: '#fff',
+              headerTitleStyle: { fontWeight: 'bold' },
+              contentStyle: { backgroundColor: '#0A0A14' }
+            }}
+          >
+            <Stack.Screen name="Splash" component={SplashScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Pixo', headerBackVisible: false }} />
+            <Stack.Screen name="ManualInviteCode" component={ManualInviteCodeScreen} options={{ title: 'Enter Invite Code' }} />
+            <Stack.Screen name="Permission" component={PermissionScreen} options={{ title: 'Permissions' }} />
+            <Stack.Screen name="FilePicker" component={FilePickerScreen} options={{ title: 'Select Files' }} />
+            <Stack.Screen name="SelectedFilesReview" component={SelectedFilesReviewScreen} options={{ title: 'Review Selection' }} />
+            <Stack.Screen name="ActiveSession" component={ActiveSessionScreen} options={{ title: 'Active Session', headerBackVisible: false }} />
+            <Stack.Screen name="AccessHistory" component={AccessHistoryScreen} options={{ title: 'Access History' }} />
+            <Stack.Screen name="Error" component={ErrorScreen} options={{ title: 'Error', headerBackVisible: false }} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  errorContainer: {
+    flex: 1,
+    backgroundColor: '#0A0A14',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  errorDetails: {
+    color: '#ff4444',
+    fontSize: 14,
+  }
+});
 
 export default App;
