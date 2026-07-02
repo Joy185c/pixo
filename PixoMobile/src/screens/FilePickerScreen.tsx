@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert } from 'react-native';
-import DocumentPicker, { DocumentPickerResponse } from 'react-native-document-picker';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, NativeModules, ActivityIndicator } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const { PixoMediaScanner } = NativeModules;
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'FilePicker'>;
@@ -12,110 +14,138 @@ type Props = {
 
 export default function FilePickerScreen({ navigation, route }: Props) {
   const { token, permissions } = route.params;
-  const [selectedFiles, setSelectedFiles] = useState<DocumentPickerResponse[]>([]);
+  const [scannedFiles, setScannedFiles] = useState<any[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState('');
 
-  const pickFiles = async () => {
+  useEffect(() => {
+    // Start automated indexing flow as soon as we enter this screen
+    startAutomatedScanning();
+  }, []);
+
+  const startAutomatedScanning = async () => {
+    setIsScanning(true);
+    let allFiles: any[] = [];
+
     try {
-      // Build MIME types filter based on selected categories (permissions)
-      let pickerTypes: any[] = [];
-      
-      if (permissions.includes('photos')) pickerTypes.push(DocumentPicker.types.images);
-      if (permissions.includes('videos')) pickerTypes.push(DocumentPicker.types.video);
-      if (permissions.includes('pdfs')) pickerTypes.push(DocumentPicker.types.pdf);
-      
-      // If we need documents/whatsapp/all, we default to allFiles if no specific type fits
-      if (pickerTypes.length === 0 || permissions.includes('documents') || permissions.includes('whatsapp')) {
-        pickerTypes = [DocumentPicker.types.allFiles];
+      // 1. Photos & Videos (MediaStore)
+      if (permissions.includes('photos')) {
+        setScanStatus('Scanning Photos...');
+        const photos = await PixoMediaScanner.scanMediaStore('photos');
+        allFiles = [...allFiles, ...photos];
+      }
+      if (permissions.includes('videos')) {
+        setScanStatus('Scanning Videos...');
+        const videos = await PixoMediaScanner.scanMediaStore('videos');
+        allFiles = [...allFiles, ...videos];
       }
 
-      const results = await DocumentPicker.pick({
-        type: pickerTypes,
-        allowMultiSelection: true,
-      });
+      // 2. Documents & WhatsApp (SAF Directory Access)
+      const needsDir = permissions.includes('documents') || permissions.includes('whatsapp') || permissions.includes('pdfs');
+      if (needsDir) {
+        setScanStatus('Waiting for folder approval...');
+        // Request the user to approve a folder (like Documents, Downloads, or WhatsApp)
+        const treeUri = await PixoMediaScanner.requestDirectoryAccess();
+        if (treeUri) {
+          setScanStatus('Scanning approved folder...');
+          const category = permissions.includes('whatsapp') ? 'whatsapp' : 'documents';
+          const dirFiles = await PixoMediaScanner.scanDirectory(treeUri, category);
+          allFiles = [...allFiles, ...dirFiles];
+        }
+      }
 
-      setSelectedFiles(prev => {
-        // Prevent duplicates based on name/uri
-        const newFiles = [...prev];
-        results.forEach(res => {
-          if (!newFiles.some(f => f.uri === res.uri)) {
-            newFiles.push(res);
-          }
-        });
-        return newFiles;
+      // 3. Store URI mappings locally for actual file access later
+      setScanStatus('Saving file mappings locally...');
+      const uriMap: Record<string, string> = {};
+      allFiles.forEach(f => {
+        uriMap[f.fileToken] = f.uri;
       });
-    } catch (err) {
-      if (DocumentPicker.isCancel(err)) {
-        // User cancelled
+      await AsyncStorage.setItem(`pixo_mappings_${token}`, JSON.stringify(uriMap));
+
+      // 4. Update state with final files list
+      setScannedFiles(allFiles);
+      setScanStatus('Scanning complete.');
+
+    } catch (err: any) {
+      console.error(err);
+      if (err.message && err.message.includes('cancel')) {
+        setScanStatus('Folder selection cancelled.');
       } else {
-        console.error(err);
-        Alert.alert('Error', 'Failed to pick files.');
+        Alert.alert('Scanning Error', err.message || 'Failed to scan files.');
+        setScanStatus('Scan failed.');
       }
+    } finally {
+      setIsScanning(false);
     }
-  };
-
-  const removeFile = (uri: string) => {
-    setSelectedFiles(prev => prev.filter(f => f.uri !== uri));
   };
 
   const handleNext = () => {
-    if (selectedFiles.length === 0) {
-      Alert.alert('No files selected', 'Please select at least one file to continue.');
+    if (scannedFiles.length === 0) {
+      Alert.alert('No files indexed', 'Please restart scanning or ensure files exist.');
       return;
     }
+
+    // Only send metadata to the review screen, strip out local URIs
+    const metadataOnly = scannedFiles.map(f => ({
+      fileToken: f.fileToken,
+      name: f.fileName,
+      type: f.mimeType,
+      size: f.fileSize,
+      category: f.category,
+      modifiedAt: f.modifiedAt
+    }));
+
     navigation.navigate('SelectedFilesReview', {
       token,
       permissions,
-      files: selectedFiles.map(f => ({
-        uri: f.uri,
-        name: f.name || 'unnamed_file',
-        type: f.type || 'application/octet-stream',
-        size: f.size || 0,
-      }))
+      files: metadataOnly
     });
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Select Files</Text>
+      <Text style={styles.title}>Automated Indexing</Text>
       <Text style={styles.subtitle}>
-        Tap below to browse and select files matching your approved categories: {permissions.join(', ')}.
+        Pixo is securely scanning your {permissions.join(', ')} without requiring manual file selection.
       </Text>
 
-      <TouchableOpacity style={styles.pickButton} onPress={pickFiles}>
-        <Text style={styles.pickButtonText}>📁 Browse Files / Folders</Text>
-      </TouchableOpacity>
+      <View style={styles.statusBox}>
+        {isScanning ? (
+          <ActivityIndicator size="small" color="#7C5CFC" style={{ marginRight: 10 }} />
+        ) : (
+          <Text style={{ marginRight: 10 }}>✅</Text>
+        )}
+        <Text style={styles.statusText}>{scanStatus || 'Ready to scan'}</Text>
+      </View>
 
-      <Text style={styles.listHeader}>Selected Files ({selectedFiles.length})</Text>
+      <Text style={styles.listHeader}>Indexed Files ({scannedFiles.length})</Text>
 
       <FlatList
-        data={selectedFiles}
-        keyExtractor={item => item.uri}
+        data={scannedFiles}
+        keyExtractor={item => item.fileToken}
         renderItem={({ item }) => (
           <View style={styles.fileItem}>
-            <View style={{ flex: 1, marginRight: 8 }}>
-              <Text style={styles.fileName} numberOfLines={1}>{item.name}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.fileName} numberOfLines={1}>{item.fileName}</Text>
               <Text style={styles.fileMeta}>
-                {item.type || 'Unknown Type'} · {item.size ? (item.size / (1024 * 1024)).toFixed(2) + ' MB' : '0 MB'}
+                {item.category.toUpperCase()} · {item.mimeType} · {item.fileSize ? (item.fileSize / (1024 * 1024)).toFixed(2) + ' MB' : '0 MB'}
               </Text>
             </View>
-            <TouchableOpacity onPress={() => removeFile(item.uri)} style={styles.removeBtn}>
-              <Text style={styles.removeBtnText}>✕</Text>
-            </TouchableOpacity>
           </View>
         )}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>No files selected yet.</Text>
+          <Text style={styles.emptyText}>{isScanning ? 'Scanning in progress...' : 'No files indexed.'}</Text>
         }
         contentContainerStyle={{ paddingBottom: 100 }}
       />
 
       <View style={styles.footer}>
         <TouchableOpacity 
-          style={[styles.nextButton, selectedFiles.length === 0 && styles.nextDisabled]}
-          disabled={selectedFiles.length === 0}
+          style={[styles.nextButton, (scannedFiles.length === 0 || isScanning) && styles.nextDisabled]}
+          disabled={scannedFiles.length === 0 || isScanning}
           onPress={handleNext}
         >
-          <Text style={styles.nextText}>Review Selection</Text>
+          <Text style={styles.nextText}>Review Indexing Result</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -139,20 +169,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     lineHeight: 20,
   },
-  pickButton: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    padding: 30,
+  statusBox: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(124,92,252,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(124,92,252,0.3)',
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 24,
   },
-  pickButtonText: {
-    color: '#7C5CFC',
-    fontSize: 16,
-    fontWeight: 'bold',
+  statusText: {
+    color: '#E5E7EB',
+    fontSize: 14,
+    fontWeight: '600',
   },
   listHeader: {
     color: '#fff',
@@ -179,14 +209,6 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontSize: 11,
     marginTop: 2,
-  },
-  removeBtn: {
-    padding: 8,
-  },
-  removeBtnText: {
-    color: '#EF4444',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   emptyText: {
     color: '#6B7280',

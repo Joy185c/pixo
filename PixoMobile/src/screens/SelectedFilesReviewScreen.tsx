@@ -12,44 +12,15 @@ type Props = {
   route: RouteProp<RootStackParamList, 'SelectedFilesReview'>;
 };
 
-// Simple helper to generate unique token
-const generateToken = () => {
-  return `rn_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-};
-
-// Helper to convert React Native URI to Base64 using fetch/FileReader
-const getBase64 = async (uri: string): Promise<string | null> => {
-  try {
-    const res = await fetch(uri);
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        resolve(reader.result as string);
-      };
-      reader.onerror = () => {
-        resolve(null);
-      };
-      reader.readAsDataURL(blob);
-    });
-  } catch (err) {
-    console.error('Error reading base64:', err);
-    return null;
-  }
-};
+// Base64 removed for automated indexing to save memory and performance
 
 export default function SelectedFilesReviewScreen({ navigation, route }: Props) {
   const { token, permissions, files } = route.params;
   const [loading, setLoading] = useState(false);
 
   // Grouping/categorizing files
-  const categorized = files.reduce((acc: any, file) => {
-    let cat = 'documents';
-    if (file.type.startsWith('image/')) cat = 'photos';
-    else if (file.type.startsWith('video/')) cat = 'videos';
-    else if (file.type === 'application/pdf') cat = 'pdfs';
-    else if (file.uri.includes('WhatsApp')) cat = 'whatsapp';
-
+  const categorized = files.reduce((acc: any, file: any) => {
+    const cat = file.category || 'documents';
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(file);
     return acc;
@@ -99,37 +70,14 @@ export default function SelectedFilesReviewScreen({ navigation, route }: Props) 
       const session = joinRes.data.session;
       const sessionId = session.id;
 
-      // 2. Map files to metadata format & generate tokens
-      const localMapping: Record<string, string> = {};
-      const payloadFiles = await Promise.all(
-        files.map(async f => {
-          const fileToken = generateToken();
-          localMapping[fileToken] = f.uri;
-
-          // Categorize
-          let category = 'documents';
-          if (f.type.startsWith('image/')) category = 'photos';
-          else if (f.type.startsWith('video/')) category = 'videos';
-          else if (f.type === 'application/pdf') category = 'pdfs';
-          else if (f.uri.includes('WhatsApp')) category = 'whatsapp';
-
-          // Get previewData (base64) for images and PDFs/Docs too so they are downloadable
-          const previewData = await getBase64(f.uri);
-
-          return {
-            fileToken,
-            fileName: f.name,
-            mimeType: f.type,
-            fileSize: f.size,
-            category,
-            modifiedAt: new Date().toISOString(),
-            previewData,
-          };
-        })
-      );
-
-      // Save local mapping inside AsyncStorage for security (only mapping token -> uri)
-      await AsyncStorage.setItem(`mapping_${sessionId}`, JSON.stringify(localMapping));
+      const payloadFiles = files.map((f: any) => ({
+        fileToken: f.fileToken,
+        fileName: f.name,
+        mimeType: f.type,
+        fileSize: f.size,
+        category: f.category,
+        modifiedAt: f.modifiedAt,
+      }));
 
       // 3. Send metadata to backend
       await apiClient.post(`/sessions/${sessionId}/files/index`, {
