@@ -83,7 +83,7 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
 
     @ReactMethod
     fun requestDirectoryAccess(promise: Promise) {
-        val activity = currentActivity
+        val activity = getCurrentActivity()
         if (activity == null) {
             promise.reject("ACTIVITY_DOES_NOT_EXIST", "Activity doesn't exist")
             return
