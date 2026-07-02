@@ -6,3 +6,9 @@
 [build.environment]
   NODE_ENV  = "production"
   NPM_FLAGS = "--include=dev"
+
+# SPA routing — all paths fall through to index.html
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
