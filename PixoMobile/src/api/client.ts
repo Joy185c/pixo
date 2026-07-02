@@ -12,7 +12,7 @@ const LOCAL_IP = '10.222.235.117';
 
 export const API_BASE_URL = __DEV__
   ? `http://${LOCAL_IP}:4000/api`
-  : 'https://pixo-backend.onrender.com/api';
+  : 'https://pixo-5l0v.onrender.com/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
