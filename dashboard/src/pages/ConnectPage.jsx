@@ -157,12 +157,16 @@ export default function ConnectPage({ token }) {
         <button className="btn btn-primary" style={{ justifyContent:'center', padding:14, gap:8 }} onClick={() => { window.location.href = `pixo://connect/${token}` }}>
           <ExternalLink size={16}/> Open Pixo App
         </button>
-        <button className="btn btn-ghost" style={{ justifyContent:'center', padding:14, opacity:0.5, cursor:'not-allowed', gap:8 }} disabled>
-          <Smartphone size={16}/> Android APK — Coming Soon
-        </button>
+        <a
+          href="https://github.com/Joy185c/pixo/releases/download/apk-latest/app-debug.apk"
+          download="pixo.apk"
+          className="btn btn-ghost"
+          style={{ justifyContent:'center', padding:14, gap:8, textDecoration:'none', display:'flex', alignItems:'center', color:'inherit' }}
+        >
+          <Smartphone size={16}/> Download Pixo for Android
+        </a>
         <div style={{ fontSize:11, color:'var(--muted)', lineHeight:1.5 }}>
-          Pixo app is not installed. Please install it first.<br/>
-          <em>(Real APK download will be available here when ready.)</em>
+          Install the APK on your Android phone, then tap <strong>Open Pixo App</strong> above.
         </div>
       </div>
 
