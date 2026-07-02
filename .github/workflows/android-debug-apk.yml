@@ -32,6 +32,11 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
+      - name: Configure Gradle and Node Memory
+        run: |
+          echo "org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m" >> ./PixoMobile/android/gradle.properties
+          export NODE_OPTIONS="--max_old_space_size=4096"
+
       - name: Make gradlew executable
         working-directory: ./PixoMobile/android
         run: chmod +x ./gradlew
