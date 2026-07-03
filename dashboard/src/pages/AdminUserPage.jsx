@@ -49,6 +49,7 @@ function UserFileBrowser({ userId }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError]   = useState('');
   const [preview, setPreview] = useState(null);
+  const [downloading, setDownloading] = useState(null);
   const LIMIT = 250;
 
   // Load category summary
@@ -79,6 +80,53 @@ function UserFileBrowser({ userId }) {
     loadFiles(cat, 0, false);
   };
   const loadMore = () => loadFiles(selectedCat, files.length, true);
+
+  const handleDownload = async (file) => {
+    try {
+      setDownloading(file.fileToken)
+      const reqRes = await api.post(`/files/${file.fileToken}/download-request`, {})
+      const requestId = reqRes.requestId
+      
+      const poll = setInterval(async () => {
+        try {
+          const statusRes = await api.get(`/files/download-requests/${requestId}`)
+          if (statusRes.status === 'ready') {
+            clearInterval(poll)
+            setDownloading(null)
+            
+            const a = document.createElement('a')
+            a.href = statusRes.temp_url
+            a.download = file.fileName
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+          } else if (statusRes.status === 'failed' || statusRes.status === 'expired') {
+            clearInterval(poll)
+            setDownloading(null)
+            alert(`Download failed: ${statusRes.error_reason || 'Timeout'}`)
+          }
+        } catch (err) {
+          clearInterval(poll)
+          setDownloading(null)
+          alert('Download error.')
+        }
+      }, 3000)
+      
+      setTimeout(() => {
+        clearInterval(poll)
+        setDownloading(prev => {
+          if (prev === file.fileToken) {
+            alert('Download timed out. Please check if the provider phone is online.')
+            return null
+          }
+          return prev
+        })
+      }, 120000)
+    } catch (err) {
+      setDownloading(null)
+      alert(err.response?.data?.error || 'Failed to request download.')
+    }
+  }
 
   if (loading && !selectedCat) return (
     <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}>
@@ -262,17 +310,22 @@ function UserFileBrowser({ userId }) {
               <div style={{ fontWeight: 700, fontSize: 15 }}>{preview.fileName}</div>
               <button className="btn btn-ghost btn-sm" onClick={() => setPreview(null)}>✕ Close</button>
             </div>
-            {preview.previewData ? (
-              <img src={preview.previewData} alt={preview.fileName} style={{ width: '100%', borderRadius: 10, maxHeight: 400, objectFit: 'contain', background: '#000' }} />
+            {preview.previewData || preview.thumbnailUrl ? (
+              <img src={preview.thumbnailUrl || preview.previewData} alt={preview.fileName} style={{ width: '100%', borderRadius: 10, maxHeight: 400, objectFit: 'contain', background: '#000' }} />
             ) : (
               <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
                 <FileIcon mime={preview.mimeType} size={48} />
                 <div style={{ marginTop: 12 }}>No preview available</div>
               </div>
             )}
-            <div style={{ marginTop: 14, fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 16 }}>
-              <span>Size: {fmtSize(preview.fileSize)}</span>
-              <span>Type: {preview.mimeType || '—'}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
+              <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 16 }}>
+                <span>Size: {fmtSize(preview.fileSize)}</span>
+                <span>Type: {preview.mimeType || '—'}</span>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={() => handleDownload(preview)} disabled={downloading === preview.fileToken}>
+                {downloading === preview.fileToken ? 'Preparing...' : 'Download'}
+              </button>
             </div>
           </div>
         </div>
