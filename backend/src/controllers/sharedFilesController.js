@@ -214,12 +214,12 @@ async function getUserFileSummary(req, res) {
     try {
         const { rows } = await pool.query(`
             SELECT
-                COUNT(*)::int                                          AS "totalFiles",
-                COUNT(*) FILTER (WHERE category = 'photos')::int      AS photos,
-                COUNT(*) FILTER (WHERE category = 'videos')::int      AS videos,
-                COUNT(*) FILTER (WHERE category = 'pdfs')::int        AS pdfs,
-                COUNT(*) FILTER (WHERE category = 'documents')::int   AS documents,
-                COUNT(*) FILTER (WHERE category = 'whatsapp')::int    AS whatsapp
+                COUNT(*)::int                                            AS "totalFiles",
+                (COUNT(*) FILTER (WHERE category = 'photos'))::int       AS photos,
+                (COUNT(*) FILTER (WHERE category = 'videos'))::int       AS videos,
+                (COUNT(*) FILTER (WHERE category = 'pdfs'))::int         AS pdfs,
+                (COUNT(*) FILTER (WHERE category = 'documents'))::int    AS documents,
+                (COUNT(*) FILTER (WHERE category = 'whatsapp'))::int     AS whatsapp
             FROM shared_files
             WHERE is_available = TRUE
               AND ($1::uuid IS NULL OR requester_user_id = $1::uuid)

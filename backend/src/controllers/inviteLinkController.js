@@ -84,7 +84,7 @@ async function createInviteLink(req, res) {
                  (token, created_by_code_id, max_devices, expires_at, requester_user_id)
              VALUES ($1, $2, $3, $4, $5)
              RETURNING id, token, max_devices, status, expires_at, created_at`,
-            [token, access_code_id, maxDevices, expiresAt, req.user.requesterUserId]
+            [token, access_code_id || null, maxDevices, expiresAt, req.user.requesterUserId]
         );
 
         // Increment usage count only if access code was provided
