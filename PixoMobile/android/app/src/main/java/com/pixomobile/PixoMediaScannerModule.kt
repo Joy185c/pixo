@@ -108,10 +108,11 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
                     fileMap.putDouble("modifiedAt", dateModified.toDouble())
 
                     // Generate thumbnail for the first 1000 items to avoid freezing the device and OOM
-                    if (count <= 1000) {
+                    if (thumbCount < 1000) {
                         val previewData = getThumbnailBase64(Uri.parse(contentUri), type, id)
                         if (previewData != null) {
                             fileMap.putString("previewData", previewData)
+                            thumbCount++
                         }
                     }
 
