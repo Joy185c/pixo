@@ -1,23 +1,16 @@
-import { useState, useEffect } from 'react'
-import { LayoutDashboard, Link2, Plus, Wifi, Server } from 'lucide-react'
-import Dashboard   from './pages/Dashboard.jsx'
-import MyLinks     from './pages/MyLinks.jsx'
-import LinkDetail  from './pages/LinkDetail.jsx'
-import ConnectPage from './pages/ConnectPage.jsx'
-import CreateLinkModal from './components/CreateLinkModal.jsx'
+import React, { useState } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, Link } from 'react-router-dom'
+import { LayoutDashboard, Link2, Plus, Wifi, Server, LogOut, Shield } from 'lucide-react'
 
-const NAV = [
-  { id: 'dashboard', Icon: LayoutDashboard, label: 'Dashboard' },
-  { id: 'links',     Icon: Link2,           label: 'My Links'  },
-]
-
-// Simple URL-based routing for /connect/:token
-function getRouteFromURL() {
-  const path = window.location.pathname
-  const match = path.match(/^\/connect\/([A-Z0-9-]+)$/)
-  if (match) return { type: 'connect', token: match[1] }
-  return { type: 'app' }
-}
+import Home from './pages/Home'
+import Login from './pages/Login'
+import Signup from './pages/Signup'
+import ConnectPage from './pages/ConnectPage'
+import Dashboard from './pages/Dashboard'
+import MyLinks from './pages/MyLinks'
+import LinkDetail from './pages/LinkDetail'
+import CreateLinkModal from './components/CreateLinkModal'
+import AdminDashboard from './pages/AdminDashboard'
 
 // Premium Pixo Logo Icon
 function PixoLogo({ size = 36 }) {
@@ -29,7 +22,6 @@ function PixoLogo({ size = 36 }) {
       boxShadow: '0 0 20px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
       position: 'relative', overflow: 'hidden', flexShrink: 0,
     }}>
-      {/* Gloss highlight */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, height: '50%',
         background: 'linear-gradient(180deg, rgba(255,255,255,0.25) 0%, transparent 100%)',
@@ -44,34 +36,31 @@ function PixoLogo({ size = 36 }) {
   )
 }
 
-export default function App() {
-  const [route, setRoute] = useState(getRouteFromURL)
-  const [page, setPage]   = useState('dashboard')
-  const [detailToken, setDetailToken] = useState(null)
+function ProtectedRoute({ children, adminOnly }) {
+  const token = localStorage.getItem('pixo_token')
+  const user = JSON.parse(localStorage.getItem('pixo_user') || '{}')
+  
+  if (!token) return <Navigate to="/login" />
+  if (adminOnly && user.role !== 'super_admin') return <Navigate to="/dashboard" />
+  return children
+}
+
+const NAV = [
+  { id: 'dashboard', Icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
+  { id: 'links',     Icon: Link2,           label: 'My Links', path: '/links'  },
+]
+
+function Layout({ children, title, sub }) {
   const [modal, setModal] = useState(false)
+  const navigate = useNavigate()
+  const user = JSON.parse(localStorage.getItem('pixo_user') || '{}')
+  const isAdmin = user.role === 'super_admin'
 
-  useEffect(() => {
-    const onPop = () => setRoute(getRouteFromURL())
-    window.addEventListener('popstate', onPop)
-    return () => window.removeEventListener('popstate', onPop)
-  }, [])
-
-  // Provider phone connect flow
-  if (route.type === 'connect') {
-    return <ConnectPage token={route.token} />
+  const handleLogout = () => {
+    localStorage.removeItem('pixo_token')
+    localStorage.removeItem('pixo_user')
+    navigate('/login')
   }
-
-  const navigate = (p, token = null) => {
-    setPage(p)
-    if (token) setDetailToken(token)
-  }
-
-  const titles = {
-    dashboard: { title: 'Dashboard',   sub: 'Overview of your Pixo activity' },
-    links:     { title: 'My Links',    sub: 'Manage your invite links' },
-    detail:    { title: detailToken || 'Link Details', sub: 'Connected devices and sessions' },
-  }
-  const current = titles[page] || titles.dashboard
 
   return (
     <div className="layout">
@@ -86,38 +75,41 @@ export default function App() {
         </div>
 
         <nav className="sidebar-nav">
-          {NAV.map(n => (
-            <button
-              key={n.id}
-              className={`nav-item ${page === n.id ? 'active' : ''}`}
-              onClick={() => setPage(n.id)}
-            >
+          {!isAdmin && NAV.map(n => (
+            <Link key={n.id} to={n.path} className={`nav-item ${window.location.pathname === n.path ? 'active' : ''}`} style={{ textDecoration: 'none' }}>
               <n.Icon size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} />
               {n.label}
-            </button>
+            </Link>
           ))}
 
+          {isAdmin && (
+            <Link to="/admin" className={`nav-item ${window.location.pathname.startsWith('/admin') ? 'active' : ''}`} style={{ textDecoration: 'none' }}>
+              <Shield size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+              Super Admin
+            </Link>
+          )}
+
           <div style={{ flex: 1 }} />
-
-          <button
-            id="sidebar-create-btn"
-            className="btn btn-primary"
-            style={{ width: '100%', justifyContent: 'center', marginTop: 8, gap: 6 }}
-            onClick={() => setModal(true)}
-          >
-            <Plus size={15} strokeWidth={2.5} />
-            New Link
+          <button className="nav-item" onClick={handleLogout} style={{ border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', color: 'var(--red)', opacity: 0.8 }}>
+            <LogOut size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+            Logout
           </button>
+          {!isAdmin && (
+            <button
+              id="sidebar-create-btn"
+              className="btn btn-primary"
+              style={{ width: '100%', justifyContent: 'center', marginTop: 8, gap: 6 }}
+              onClick={() => setModal(true)}
+            >
+              <Plus size={15} strokeWidth={2.5} />
+              New Link
+            </button>
+          )}
         </nav>
-
         <div className="sidebar-footer">
           <div style={{ fontWeight: 600, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
             <Server size={12} style={{ color: 'var(--muted)' }} />
-            Pixo Backend
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-            <Wifi size={11} style={{ color: 'var(--green)' }} />
-            <span style={{ fontSize: 10, wordBreak: 'break-all' }}>pixo-5l0v.onrender.com</span>
+            {user.name} ({user.role})
           </div>
         </div>
       </aside>
@@ -126,30 +118,63 @@ export default function App() {
       <div className="main">
         <header className="topbar">
           <div>
-            <div className="topbar-title">{current.title}</div>
-            <div className="topbar-sub">{current.sub}</div>
+            <div className="topbar-title">{title}</div>
+            <div className="topbar-sub">{sub}</div>
           </div>
-          {page !== 'detail' && (
-            <button className="btn btn-primary btn-sm" style={{ gap: 5 }} onClick={() => setModal(true)}>
-              <Plus size={13} strokeWidth={2.5} />
-              New Link
-            </button>
-          )}
         </header>
 
         <div className="content">
-          {page === 'dashboard' && <Dashboard onNavigate={navigate} />}
-          {page === 'links'     && <MyLinks   onNavigate={navigate} />}
-          {page === 'detail'    && <LinkDetail token={detailToken} onBack={() => setPage('links')} />}
+          {children}
         </div>
       </div>
 
       {modal && (
         <CreateLinkModal
           onClose={() => setModal(false)}
-          onCreated={() => { setModal(false); setPage('links') }}
+          onCreated={() => { setModal(false); navigate('/links') }}
         />
       )}
     </div>
+  )
+}
+
+// Wrapper Components to pass props
+function DashboardPage() {
+  const navigate = useNavigate()
+  return <Layout title="Dashboard" sub="Overview of your Pixo activity"><Dashboard onNavigate={(p, token) => navigate(token ? `/links/${token}` : `/${p}`)} /></Layout>
+}
+
+function MyLinksPage() {
+  const navigate = useNavigate()
+  return <Layout title="My Links" sub="Manage your invite links"><MyLinks onNavigate={(p, token) => navigate(token ? `/links/${token}` : `/${p}`)} /></Layout>
+}
+
+function LinkDetailPage() {
+  const navigate = useNavigate()
+  const { token } = useParams()
+  return <Layout title={token} sub="Connected devices and sessions"><LinkDetail token={token} onBack={() => navigate('/links')} /></Layout>
+}
+
+// Admin Panel (uses full AdminDashboard)
+function AdminPage() {
+  return <AdminDashboard />
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/connect/:token" element={<ConnectPage />} />
+        
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/links" element={<ProtectedRoute><MyLinksPage /></ProtectedRoute>} />
+        <Route path="/links/:token" element={<ProtectedRoute><LinkDetailPage /></ProtectedRoute>} />
+        
+        <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
+      </Routes>
+    </BrowserRouter>
   )
 }

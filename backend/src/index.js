@@ -9,6 +9,8 @@ const inviteLinkRoutes    = require('./routes/inviteLinks');
 const sessionRoutes       = require('./routes/sessions');
 const dashboardRoutes     = require('./routes/dashboard');
 const appRoutes           = require('./routes/app');
+const authRoutes          = require('./routes/auth');
+const adminRoutes         = require('./routes/admin');
 
 const ALLOWED_ORIGINS = [
     'http://localhost:5173',
@@ -47,6 +49,8 @@ app.use('/api/invite-links', inviteLinkRoutes);
 app.use('/api/sessions',     sessionRoutes);
 app.use('/api/dashboard',    dashboardRoutes);
 app.use('/api/app',          appRoutes);
+app.use('/api/auth',         authRoutes);
+app.use('/api/admin',        adminRoutes);
 
 // ── 404 catch-all ─────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));

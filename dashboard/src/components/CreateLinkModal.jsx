@@ -1,36 +1,29 @@
 import { useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { Copy, Share2, QrCode, CheckCircle, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { Copy, Share2, QrCode, CheckCircle, X, Plus } from 'lucide-react'
 import { api } from '../api.js'
 import { getShareLink } from '../config.js'
 
-const STEPS = { CODE: 'code', CREATING: 'creating', DONE: 'done' }
+const STEPS = { CONFIRM: 'confirm', CREATING: 'creating', DONE: 'done' }
 
 export default function CreateLinkModal({ onClose, onCreated }) {
-  const [step, setStep]       = useState(STEPS.CODE)
-  const [code, setCode]       = useState('')
+  const [step, setStep]       = useState(STEPS.CONFIRM)
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult]   = useState(null)
   const [copied, setCopied]   = useState(false)
   const [showQR, setShowQR]   = useState(false)
 
-  const verify = async () => {
-    if (!code.trim()) { setError('Please enter your Pixo Access Code.'); return }
+  const create = async () => {
     setLoading(true); setError('')
+    setStep(STEPS.CREATING)
     try {
-      const res = await api.post('/access-codes/verify', { code: code.trim() })
-      if (!res.verified) { setError(res.error || 'Invalid access code.'); setLoading(false); return }
-
-      setStep(STEPS.CREATING)
-      const linkRes = await api.post('/invite-links', { access_code_id: res.access_code_id })
-      if (linkRes.error) { setError(linkRes.error); setStep(STEPS.CODE); setLoading(false); return }
-
+      const linkRes = await api.post('/invite-links', {})
       setResult(linkRes.link)
       setStep(STEPS.DONE)
-    } catch {
-      setError('Connection error. Is the backend running?')
-      setStep(STEPS.CODE)
+    } catch (err) {
+      setError(err.message || 'Failed to create link. Is the backend running?')
+      setStep(STEPS.CONFIRM)
     }
     setLoading(false)
   }
@@ -55,30 +48,18 @@ export default function CreateLinkModal({ onClose, onCreated }) {
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal" style={{ width: step === STEPS.DONE ? 460 : 420 }}>
 
-        {/* ── Step: Enter Code ── */}
-        {step === STEPS.CODE && (
+        {/* ── Step: Confirm Create ── */}
+        {step === STEPS.CONFIRM && (
           <>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🔐</div>
-            <div className="modal-title">Verify Access Code</div>
-            <div className="modal-sub">Enter your Pixo Access Code to create a new invite link.</div>
-            <div className="form-group">
-              <label className="form-label">Access Code</label>
-              <input
-                id="access-code-input"
-                className={`form-input ${error ? 'error' : ''}`}
-                type="password"
-                placeholder="Enter your access code"
-                value={code}
-                onChange={e => { setCode(e.target.value); setError('') }}
-                onKeyDown={e => e.key === 'Enter' && verify()}
-                autoFocus
-              />
-              {error && <div className="error-msg">⚠ {error}</div>}
-            </div>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🔗</div>
+            <div className="modal-title">Create New Invite Link</div>
+            <div className="modal-sub">This will generate a new shareable link for your provider devices to connect.</div>
+            {error && <div className="error-msg" style={{ marginBottom: 16 }}>⚠ {error}</div>}
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancel</button>
-              <button id="verify-btn" className="btn btn-primary" style={{ flex: 1 }} onClick={verify} disabled={loading}>
-                {loading ? 'Verifying…' : 'Verify & Create →'}
+              <button id="create-link-confirm-btn" className="btn btn-primary" style={{ flex: 1, gap: 6 }} onClick={create} disabled={loading}>
+                <Plus size={14} strokeWidth={2.5} />
+                {loading ? 'Creating…' : 'Create Link →'}
               </button>
             </div>
           </>

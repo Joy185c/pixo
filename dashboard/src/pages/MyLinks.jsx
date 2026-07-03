@@ -9,7 +9,7 @@ export default function MyLinks({ onNavigate }) {
   const [modal, setModal]   = useState(false)
   const [filter, setFilter] = useState('all')
 
-  const load = () => api.get('/dashboard/links').then(r => setLinks(r.links || []))
+  const load = () => api.get('/dashboard/links').then(r => setLinks(r.links || [])).catch(console.error)
   useEffect(() => { load() }, [])
 
   const filtered = filter === 'all' ? links : links.filter(l => l.status === filter)

@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS shared_files (
     modified_at    TIMESTAMPTZ,                                 -- file's own last-modified timestamp
     is_available   BOOLEAN     NOT NULL DEFAULT TRUE,          -- set false when session revokes/expires
     expires_at     TIMESTAMPTZ NOT NULL,                       -- mirrors parent session expires_at
+    preview_data   TEXT,                                       -- base64 thumbnail data
+    requester_user_id UUID     REFERENCES requester_users(id) ON DELETE CASCADE,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

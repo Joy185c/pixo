@@ -24,8 +24,8 @@ export default function Dashboard({ onNavigate }) {
   const [links, setLinks]     = useState([])
 
   useEffect(() => {
-    api.get('/dashboard/summary').then(r => setSummary(r.summary))
-    api.get('/dashboard/links').then(r => setLinks(r.links || []))
+    api.get('/dashboard/summary').then(r => setSummary(r.summary)).catch(console.error)
+    api.get('/dashboard/links').then(r => setLinks(r.links || [])).catch(console.error)
   }, [])
 
   const stats = [

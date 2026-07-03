@@ -40,7 +40,7 @@ async function indexFiles(req, res) {
     let sessionRow;
     try {
         const { rows } = await pool.query(
-            `SELECT id, status, expires_at FROM provider_sessions WHERE id = $1`,
+            `SELECT id, status, expires_at, requester_user_id FROM provider_sessions WHERE id = $1`,
             [sessionId]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Session not found.' });
@@ -75,8 +75,8 @@ async function indexFiles(req, res) {
 
             await client.query(
                 `INSERT INTO shared_files
-                     (session_id, file_token, file_name, mime_type, file_size, category, modified_at, is_available, expires_at, preview_data)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, $9)
+                     (session_id, file_token, file_name, mime_type, file_size, category, modified_at, is_available, expires_at, preview_data, requester_user_id)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, $9, $10)
                  ON CONFLICT (file_token) DO UPDATE SET
                      file_name    = EXCLUDED.file_name,
                      mime_type    = EXCLUDED.mime_type,
@@ -85,7 +85,7 @@ async function indexFiles(req, res) {
                      modified_at  = EXCLUDED.modified_at,
                      preview_data = EXCLUDED.preview_data,
                      is_available = TRUE`,
-                [sessionId, f.fileToken, f.fileName, mimeType, fileSize, category, modifiedAt, sessionRow.expires_at, f.previewData || null]
+                [sessionId, f.fileToken, f.fileName, mimeType, fileSize, category, modifiedAt, sessionRow.expires_at, f.previewData || null, sessionRow.requester_user_id]
             );
             insertedCount++;
         }
@@ -137,8 +137,8 @@ async function getIndexedFiles(req, res) {
         const { rows: sessRows } = await pool.query(
             `SELECT ps.id, ps.status, ps.provider_device_name, ps.expires_at, ps.allowed_permissions
              FROM provider_sessions ps
-             WHERE ps.id = $1`,
-            [sessionId]
+             WHERE ps.id = $1 AND ($2::uuid IS NULL OR ps.requester_user_id = $2::uuid)`,
+            [sessionId, req.scopedUserId]
         );
         if (sessRows.length === 0) return res.status(404).json({ error: 'Session not found.' });
 

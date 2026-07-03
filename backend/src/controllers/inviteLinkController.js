@@ -22,10 +22,7 @@ const INVITE_LINK_TTL_HOURS   = parseInt(process.env.INVITE_LINK_TTL_HOURS   || 
  */
 async function createInviteLink(req, res) {
     const { access_code_id, max_devices } = req.body;
-
-    if (!access_code_id) {
-        return res.status(400).json({ error: 'access_code_id is required.' });
-    }
+    // access_code_id is now optional — JWT-authenticated users can create links without it
 
     let client;
     try {
@@ -38,26 +35,29 @@ async function createInviteLink(req, res) {
     try {
         await client.query('BEGIN');
 
-        // Re-validate the access code inside the transaction
-        const { rows: codeRows } = await client.query(
-            `SELECT id, max_link_create, used_count
-             FROM   access_codes
-             WHERE  id        = $1
-               AND  is_active = TRUE
-               AND  (expires_at IS NULL OR expires_at > NOW())
-             FOR UPDATE`,
-            [access_code_id]
-        );
+        let code = null;
+        if (access_code_id) {
+            // Re-validate the access code inside the transaction
+            const { rows: codeRows } = await client.query(
+                `SELECT id, max_link_create, used_count
+                 FROM   access_codes
+                 WHERE  id        = $1
+                   AND  is_active = TRUE
+                   AND  (expires_at IS NULL OR expires_at > NOW())
+                 FOR UPDATE`,
+                [access_code_id]
+            );
 
-        if (codeRows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(403).json({ error: 'Access code is not valid or has expired.' });
-        }
+            if (codeRows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ error: 'Access code is not valid or has expired.' });
+            }
 
-        const code = codeRows[0];
-        if (code.max_link_create > 0 && code.used_count >= code.max_link_create) {
-            await client.query('ROLLBACK');
-            return res.status(403).json({ error: 'Link creation limit reached for this access code.' });
+            code = codeRows[0];
+            if (code.max_link_create > 0 && code.used_count >= code.max_link_create) {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ error: 'Link creation limit reached for this access code.' });
+            }
         }
 
         // Generate a unique token (retry on collision)
@@ -81,17 +81,19 @@ async function createInviteLink(req, res) {
 
         const { rows: linkRows } = await client.query(
             `INSERT INTO invite_links
-                 (token, created_by_code_id, max_devices, expires_at)
-             VALUES ($1, $2, $3, $4)
+                 (token, created_by_code_id, max_devices, expires_at, requester_user_id)
+             VALUES ($1, $2, $3, $4, $5)
              RETURNING id, token, max_devices, status, expires_at, created_at`,
-            [token, access_code_id, maxDevices, expiresAt]
+            [token, access_code_id, maxDevices, expiresAt, req.user.requesterUserId]
         );
 
-        // Increment usage count
-        await client.query(
-            `UPDATE access_codes SET used_count = used_count + 1 WHERE id = $1`,
-            [access_code_id]
-        );
+        // Increment usage count only if access code was provided
+        if (access_code_id && code) {
+            await client.query(
+                `UPDATE access_codes SET used_count = used_count + 1 WHERE id = $1`,
+                [access_code_id]
+            );
+        }
 
         await client.query('COMMIT');
 
@@ -134,7 +136,9 @@ async function getInviteLinks(req, res) {
                  ac.label AS access_code_label
              FROM  invite_links il
              JOIN  access_codes ac ON ac.id = il.created_by_code_id
-             ORDER BY il.created_at DESC`
+             WHERE ($1::uuid IS NULL OR il.requester_user_id = $1::uuid)
+             ORDER BY il.created_at DESC`,
+            [req.scopedUserId]
         );
 
         return res.json({ links: rows });
@@ -158,7 +162,8 @@ async function getInviteLinkDetails(req, res) {
         await pool.query(`SELECT expire_provider_sessions()`);
 
         const { rows: linkRows } = await pool.query(
-            `SELECT * FROM invite_links WHERE token = $1`, [token]
+            `SELECT * FROM invite_links WHERE token = $1 AND ($2::uuid IS NULL OR requester_user_id = $2::uuid)`, 
+            [token, req.scopedUserId]
         );
         if (linkRows.length === 0) {
             return res.status(404).json({ error: 'Invite link not found.' });
@@ -221,8 +226,9 @@ async function disableInviteLink(req, res) {
              SET    status = 'disabled'
              WHERE  token  = $1
                AND  status != 'disabled'
+               AND  ($2::uuid IS NULL OR requester_user_id = $2::uuid)
              RETURNING id`,
-            [token]
+            [token, req.scopedUserId]
         );
         if (rows.length === 0) {
             await client.query('ROLLBACK');

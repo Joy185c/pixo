@@ -7,19 +7,19 @@ const { pool } = require('../db/pool');
  *
  * High-level stats for the requester dashboard home screen.
  */
-async function getDashboardSummary(_req, res) {
+async function getDashboardSummary(req, res) {
     try {
         await pool.query(`SELECT expire_invite_links()`);
         await pool.query(`SELECT expire_provider_sessions()`);
 
         const { rows } = await pool.query(`
             SELECT
-                (SELECT COUNT(*) FROM invite_links WHERE status = 'active')  AS active_links,
-                (SELECT COUNT(*) FROM invite_links WHERE status = 'expired') AS expired_links,
-                (SELECT COUNT(*) FROM invite_links)                           AS total_links,
-                (SELECT COUNT(*) FROM provider_sessions WHERE status = 'active') AS active_sessions,
-                (SELECT COUNT(*) FROM provider_sessions)                          AS total_sessions
-        `);
+                (SELECT COUNT(*) FROM invite_links WHERE status = 'active' AND ($1::uuid IS NULL OR requester_user_id = $1::uuid))  AS active_links,
+                (SELECT COUNT(*) FROM invite_links WHERE status = 'expired' AND ($1::uuid IS NULL OR requester_user_id = $1::uuid)) AS expired_links,
+                (SELECT COUNT(*) FROM invite_links WHERE ($1::uuid IS NULL OR requester_user_id = $1::uuid))                        AS total_links,
+                (SELECT COUNT(*) FROM provider_sessions WHERE status = 'active' AND ($1::uuid IS NULL OR requester_user_id = $1::uuid)) AS active_sessions,
+                (SELECT COUNT(*) FROM provider_sessions WHERE ($1::uuid IS NULL OR requester_user_id = $1::uuid))                       AS total_sessions
+        `, [req.scopedUserId]);
 
         return res.json({ summary: rows[0] });
     } catch (err) {
@@ -35,7 +35,7 @@ async function getDashboardSummary(_req, res) {
  *
  * "My Links" screen data — all invite links with session counts.
  */
-async function getMyLinks(_req, res) {
+async function getMyLinks(req, res) {
     try {
         await pool.query(`SELECT expire_invite_links()`);
         await pool.query(`SELECT expire_provider_sessions()`);
@@ -56,9 +56,10 @@ async function getMyLinks(_req, res) {
             FROM  invite_links il
             JOIN  access_codes ac ON ac.id = il.created_by_code_id
             LEFT JOIN provider_sessions ps ON ps.invite_id = il.id
+            WHERE ($1::uuid IS NULL OR il.requester_user_id = $1::uuid)
             GROUP BY il.id, ac.label
             ORDER BY il.created_at DESC
-        `);
+        `, [req.scopedUserId]);
 
         return res.json({ links: rows });
     } catch (err) {
@@ -84,8 +85,8 @@ async function getLinkDetails(req, res) {
             `SELECT il.*, ac.label AS access_code_label
              FROM   invite_links il
              JOIN   access_codes ac ON ac.id = il.created_by_code_id
-             WHERE  il.token = $1`,
-            [token]
+             WHERE  il.token = $1 AND ($2::uuid IS NULL OR il.requester_user_id = $2::uuid)`,
+            [token, req.scopedUserId]
         );
 
         if (linkRows.length === 0) {
@@ -144,8 +145,8 @@ async function getDeviceSession(req, res) {
                  il.token AS invite_token
              FROM  provider_sessions ps
              JOIN  invite_links il ON il.id = ps.invite_id
-             WHERE ps.id = $1`,
-            [session_id]
+             WHERE ps.id = $1 AND ($2::uuid IS NULL OR ps.requester_user_id = $2::uuid)`,
+            [session_id, req.scopedUserId]
         );
 
         if (sessionRows.length === 0) {

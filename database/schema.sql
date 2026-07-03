@@ -7,6 +7,19 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================
+-- TABLE: requester_users
+-- ============================================================
+CREATE TABLE IF NOT EXISTS requester_users (
+    id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    name             TEXT        NOT NULL,
+    email_or_username TEXT       NOT NULL UNIQUE,
+    access_code_hash TEXT        NOT NULL,
+    role             TEXT        NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'super_admin')),
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============================================================
 -- TABLE: access_codes
 -- Stores hashed Pixo Access Codes used to gate invite-link
 -- creation. Only the bcrypt hash is stored — never plaintext.
@@ -34,8 +47,8 @@ COMMENT ON COLUMN access_codes.max_link_create IS '0 means unlimited link creati
 CREATE TABLE IF NOT EXISTS invite_links (
     id                      UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     token                   TEXT        NOT NULL UNIQUE,   -- e.g. "PX-8K29A"
-    created_by_code_id      UUID        NOT NULL REFERENCES access_codes(id) ON DELETE RESTRICT,
-    requester_user_id       TEXT,                          -- optional: tie to an app user later
+    created_by_code_id      UUID        REFERENCES access_codes(id) ON DELETE SET NULL,
+    requester_user_id       UUID        REFERENCES requester_users(id) ON DELETE CASCADE,
     max_devices             INT         NOT NULL DEFAULT 50, -- max phones that can connect
     connected_devices_count INT         NOT NULL DEFAULT 0,
     status                  TEXT        NOT NULL DEFAULT 'active'
@@ -61,6 +74,7 @@ COMMENT ON COLUMN invite_links.connected_devices_count IS 'Cached count; kept in
 CREATE TABLE IF NOT EXISTS provider_sessions (
     id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     invite_id             UUID        NOT NULL REFERENCES invite_links(id) ON DELETE CASCADE,
+    requester_user_id     UUID        REFERENCES requester_users(id) ON DELETE CASCADE,
     provider_device_id    TEXT        NOT NULL,            -- fingerprint / unique device ID from mobile app
     provider_device_name  TEXT        NOT NULL,            -- e.g. "Samsung A52"
     provider_user_agent   TEXT,                            -- HTTP User-Agent of the provider device

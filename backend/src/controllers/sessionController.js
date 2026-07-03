@@ -43,7 +43,7 @@ async function joinSession(req, res) {
 
         // Lock the invite link row
         const { rows: linkRows } = await client.query(
-            `SELECT id, status, max_devices, connected_devices_count
+            `SELECT id, status, max_devices, connected_devices_count, requester_user_id
              FROM   invite_links
              WHERE  token = $1
              FOR UPDATE`,
@@ -89,8 +89,8 @@ async function joinSession(req, res) {
         const { rows: sessionRows } = await client.query(
             `INSERT INTO provider_sessions
                  (invite_id, provider_device_id, provider_device_name,
-                  provider_user_agent, provider_ip, allowed_permissions, expires_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+                  provider_user_agent, provider_ip, allowed_permissions, expires_at, requester_user_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING id, status, allowed_permissions, expires_at, created_at`,
             [
                 link.id,
@@ -99,7 +99,8 @@ async function joinSession(req, res) {
                 user_agent || req.headers['user-agent'] || null,
                 providerIp,
                 JSON.stringify(permissions),
-                expiresAt
+                expiresAt,
+                link.requester_user_id
             ]
         );
 
@@ -145,8 +146,8 @@ async function getSessionDetails(req, res) {
                  il.token                AS invite_token
              FROM  provider_sessions ps
              JOIN  invite_links il ON il.id = ps.invite_id
-             WHERE ps.id = $1`,
-            [session_id]
+             WHERE ps.id = $1 AND ($2::uuid IS NULL OR ps.requester_user_id = $2::uuid)`,
+            [session_id, req.scopedUserId]
         );
 
         if (rows.length === 0) {
@@ -186,8 +187,9 @@ async function revokeSession(req, res) {
                     revoked_at = NOW()
              WHERE  id     = $1
                AND  status = 'active'
+               AND  ($2::uuid IS NULL OR requester_user_id = $2::uuid)
              RETURNING id, invite_id, provider_device_name`,
-            [session_id]
+            [session_id, req.scopedUserId]
         );
 
         if (rows.length === 0) {
@@ -231,8 +233,8 @@ async function listFilesInSession(req, res) {
         const { rows } = await pool.query(
             `SELECT id, status, allowed_permissions, expires_at
              FROM   provider_sessions
-             WHERE  id = $1`,
-            [session_id]
+             WHERE  id = $1 AND ($2::uuid IS NULL OR requester_user_id = $2::uuid)`,
+            [session_id, req.scopedUserId]
         );
 
         if (rows.length === 0) return res.status(404).json({ error: 'Session not found.' });
