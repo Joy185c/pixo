@@ -27,7 +27,7 @@ export default function ConnectPage({ token }) {
   const [copied, setCopied]     = useState(false)
 
   useEffect(() => {
-    api.get(`/invite-links/${token}`)
+    api.get(`/invite-links/verify/${token}`)
       .then(res => {
         if (res.error || !res.link) { setErrorMsg(res.error || 'Invalid or expired invite link.'); setStep('error'); return }
         if (res.link.status !== 'active') { setErrorMsg(`This invite link is currently ${res.link.status}.`); setStep('error'); return }

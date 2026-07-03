@@ -256,9 +256,38 @@ async function disableInviteLink(req, res) {
     }
 }
 
+/**
+ * verifyInviteLink
+ *
+ * GET /api/invite-links/verify/:token
+ *
+ * Public endpoint for providers (mobile app or simulator) to verify
+ * the status of a link without needing authentication.
+ */
+async function verifyInviteLink(req, res) {
+    const { token } = req.params;
+    try {
+        await pool.query(`SELECT expire_invite_links()`);
+        const { rows } = await pool.query(
+            `SELECT id, token, max_devices, connected_devices_count, status
+             FROM invite_links
+             WHERE token = $1`,
+            [token]
+        );
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Invite link not found.' });
+        }
+        return res.json({ link: rows[0] });
+    } catch (err) {
+        console.error('[verifyInviteLink] Error:', err.message);
+        return res.status(500).json({ error: 'Internal server error.' });
+    }
+}
+
 module.exports = {
     createInviteLink,
     getInviteLinks,
     getInviteLinkDetails,
-    disableInviteLink
+    disableInviteLink,
+    verifyInviteLink
 };
