@@ -55,8 +55,8 @@ function DeviceFilesView({ session, userId, onBack }) {
   const fetchFiles = useCallback((category) => {
     setLoading(true); setError('')
     let path = category
-      ? `/sessions/${session.id}/files?category=${category}&limit=250&offset=0`
-      : `/sessions/${session.id}/files?limit=250&offset=0`
+      ? `/sessions/${session.id}/files?category=${category}&limit=500&offset=0`
+      : `/sessions/${session.id}/files?limit=500&offset=0`
     if (userId) path = `/admin/users/${userId}` + path
     else        path = `/dashboard` + path
     api.get(path)
@@ -71,8 +71,8 @@ function DeviceFilesView({ session, userId, onBack }) {
     const curFiles = filesData?.files || []
     setLoadingMore(true)
     let path = selectedCat
-      ? `/sessions/${session.id}/files?category=${selectedCat}&limit=250&offset=${curFiles.length}`
-      : `/sessions/${session.id}/files?limit=250&offset=${curFiles.length}`
+      ? `/sessions/${session.id}/files?category=${selectedCat}&limit=500&offset=${curFiles.length}`
+      : `/sessions/${session.id}/files?limit=500&offset=${curFiles.length}`
     if (userId) path = `/admin/users/${userId}` + path
     else        path = `/dashboard` + path
     api.get(path).then(data => {

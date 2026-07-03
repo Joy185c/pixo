@@ -12,7 +12,7 @@ type Props = {
 };
 
 export default function ActiveSessionScreen({ navigation, route }: Props) {
-  const { session, totalFiles } = route.params;
+  const { session, totalFiles, token } = route.params;
   const [timeLeft, setTimeLeft] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -49,7 +49,7 @@ export default function ActiveSessionScreen({ navigation, route }: Props) {
         const res = await apiClient.get(`/sessions/${session.id}/download-requests`);
         const requests = res.data.requests;
         if (requests && requests.length > 0) {
-          const mappingStr = await AsyncStorage.getItem(`pixo_mappings_${session.invite_id}`);
+          const mappingStr = await AsyncStorage.getItem(`pixo_mappings_${token}`);
           const mapping = mappingStr ? JSON.parse(mappingStr) : {};
 
           for (const req of requests) {
@@ -83,7 +83,7 @@ export default function ActiveSessionScreen({ navigation, route }: Props) {
     return () => {
       polling = false;
     };
-  }, [session.id, session.invite_id]);
+  }, [session.id, token]);
 
   const handleRevoke = async () => {
     setLoading(true);

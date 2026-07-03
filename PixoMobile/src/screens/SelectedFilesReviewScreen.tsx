@@ -104,7 +104,9 @@ export default function SelectedFilesReviewScreen({ navigation, route }: Props) 
       }
       console.log(`[Upload] Backend saved count: ${totalSaved}`);
 
-      navigation.navigate('ActiveSession', { session, totalFiles: files.length });
+      // (The mapping with actual URIs is already saved in FilePickerScreen using 'token')
+
+      navigation.navigate('ActiveSession', { session, totalFiles: files.length, token });
     } catch (err: any) {
       console.error(err);
       Alert.alert('Error', err.response?.data?.error || 'Failed to approve invite.');

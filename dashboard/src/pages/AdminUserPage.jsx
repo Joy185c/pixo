@@ -50,7 +50,7 @@ function UserFileBrowser({ userId }) {
   const [error, setError]   = useState('');
   const [preview, setPreview] = useState(null);
   const [downloading, setDownloading] = useState(null);
-  const LIMIT = 250;
+  const LIMIT = 500;
 
   // Load category summary
   useEffect(() => {

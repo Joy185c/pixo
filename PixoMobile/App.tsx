@@ -21,7 +21,7 @@ export type RootStackParamList = {
   Permission: { token: string };
   FilePicker: { token: string; permissions: string[] };
   SelectedFilesReview: { token: string; permissions: string[]; files: any[] };
-  ActiveSession: { session: any; totalFiles: number };
+  ActiveSession: { session: any; totalFiles: number; token: string };
   AccessHistory: undefined;
   Error: { errorMsg: string };
 };
