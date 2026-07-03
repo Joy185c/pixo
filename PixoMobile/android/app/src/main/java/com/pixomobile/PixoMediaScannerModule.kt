@@ -107,13 +107,10 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
                     fileMap.putString("category", type)
                     fileMap.putDouble("modifiedAt", dateModified.toDouble())
 
-                    // Generate thumbnail for the first 500 items to avoid OOM
-                    if (count <= 500 || thumbCount < 500) {
-                        val previewData = getThumbnailBase64(Uri.parse(contentUri), type, id)
-                        if (previewData != null) {
-                            fileMap.putString("previewData", previewData)
-                            thumbCount++
-                        }
+                    // Generate thumbnail for all files at low quality to minimize memory/payload
+                    val previewData = getThumbnailBase64(Uri.parse(contentUri), type, id)
+                    if (previewData != null) {
+                        fileMap.putString("previewData", previewData)
                     }
 
                     fileList.pushMap(fileMap)
@@ -228,7 +225,7 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
         try {
             val bitmap: Bitmap?
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                bitmap = reactApplicationContext.contentResolver.loadThumbnail(uri, Size(150, 150), null)
+                bitmap = reactApplicationContext.contentResolver.loadThumbnail(uri, Size(100, 100), null)
             } else {
                 bitmap = if (type == "photos") {
                     MediaStore.Images.Thumbnails.getThumbnail(reactApplicationContext.contentResolver, id, MediaStore.Images.Thumbnails.MINI_KIND, null)
@@ -238,7 +235,7 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
             }
             if (bitmap != null) {
                 val outputStream = ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 40, outputStream)
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 20, outputStream)
                 val bytes = outputStream.toByteArray()
                 bitmap.recycle()
                 return "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)

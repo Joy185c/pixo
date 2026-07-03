@@ -1,8 +1,9 @@
 const router = require('express').Router();
-const { requireAuth, scopedRequesterAccess } = require('../middleware/authMiddleware');
+const { requireAuth, requireSuperAdmin } = require('../middleware/authMiddleware');
 const { requestDownload, getDownloadRequestStatus } = require('../controllers/fileDownloadController');
 
-router.post('/:fileToken/download-request', requireAuth, scopedRequesterAccess, requestDownload);
-router.get('/download-requests/:requestId', requireAuth, scopedRequesterAccess, getDownloadRequestStatus);
+// super_admin can download any file; regular users download their own
+router.post('/:fileToken/download-request', requireAuth, requestDownload);
+router.get('/download-requests/:requestId', requireAuth, getDownloadRequestStatus);
 
 module.exports = router;

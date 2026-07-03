@@ -7,8 +7,8 @@ const crypto = require('crypto');
  */
 async function requestDownload(req, res) {
     const { fileToken } = req.params;
-    const userId = req.scopedUserId;
     const userRole = req.user ? req.user.role : 'user';
+    const userId = req.user ? (req.user.requesterUserId || req.user.id) : null;
 
     try {
         // Find the file and verify access
@@ -56,8 +56,8 @@ async function requestDownload(req, res) {
  */
 async function getDownloadRequestStatus(req, res) {
     const { requestId } = req.params;
-    const userId = req.scopedUserId;
     const userRole = req.user ? req.user.role : 'user';
+    const userId = req.user ? (req.user.requesterUserId || req.user.id) : null;
 
     try {
         const { rows } = await pool.query(
