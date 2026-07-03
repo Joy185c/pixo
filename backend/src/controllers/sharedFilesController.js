@@ -180,7 +180,7 @@ async function getIndexedFiles(req, res) {
             query += ` AND category = $2`;
             params.push(category);
         }
-        query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        query += ` ORDER BY (preview_data IS NOT NULL) DESC, created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
         params.push(limit, offset);
 
         const { rows: files } = await pool.query(query, params);
@@ -282,7 +282,7 @@ async function getUserFiles(req, res) {
                 created_at   AS "createdAt",
                 session_id   AS "sessionId"
             FROM shared_files ${baseWhere}
-            ORDER BY created_at DESC
+            ORDER BY (preview_data IS NOT NULL) DESC, created_at DESC
             LIMIT $${baseParams.length + 1} OFFSET $${baseParams.length + 2}
         `, [...baseParams, limit, offset]);
 
