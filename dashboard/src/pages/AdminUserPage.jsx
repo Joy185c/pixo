@@ -537,7 +537,7 @@ export default function AdminUserPage() {
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(245,200,66,0.1)',
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(245,200,66,0.1)', border: '1px solid rgba(245,200,66,0.25)', borderRadius: 10, padding: '6px 14px' }}>
           <Shield size={14} style={{ color: 'var(--yellow)' }} />
           <span style={{ fontSize: 13, color: 'var(--yellow)', fontWeight: 600 }}>Viewing as Super Admin</span>
         </div>
