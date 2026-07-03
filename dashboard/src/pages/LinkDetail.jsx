@@ -129,8 +129,7 @@ function DeviceFilesView({ session, onBack }) {
       {totalFiles === 0 ? (
         <div className="empty-state">
           <div className="empty-icon"><Folder size={36} strokeWidth={1.2} style={{ opacity:0.4 }} /></div>
-          <div className="empty-text">No files shared from this device yet.</div>
-          <div style={{ fontSize:13, color:'var(--muted)', marginTop:6 }}>The provider must select files from their phone.</div>
+          <div className="empty-text">No approved files available yet.</div>
         </div>
       ) : (
         <div>
@@ -181,42 +180,77 @@ function DeviceFilesView({ session, onBack }) {
       {files.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">{catMeta.Icon && <catMeta.Icon size={36} strokeWidth={1.2} style={{ opacity:0.4 }} />}</div>
-          <div className="empty-text">No {catMeta.label?.toLowerCase()} shared yet.</div>
+          <div className="empty-text">No approved files available yet.</div>
         </div>
       ) : (
-        <div className="card" style={{ padding:0, overflow:'hidden' }}>
-          {files.map((file, idx) => {
-            const isImg = file.mimeType?.startsWith('image/')
-            const isPdf = file.mimeType === 'application/pdf'
-            const hasPreview = isImg || isPdf
-            return (
-              <div key={file.fileToken}
-                style={{ display:'flex', alignItems:'center', gap:14, padding:'13px 18px',
-                  borderBottom:idx<files.length-1?'1px solid var(--border)':'none', transition:'background .15s' }}
-                onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.03)'}
-                onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                <FileIcon mime={file.mimeType} size={22} />
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontWeight:600, fontSize:14, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                    {file.fileName}
+        selectedCat === 'photos' || selectedCat === 'videos' ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
+            {files.map((file, idx) => {
+              const isImg = file.mimeType?.startsWith('image/')
+              const isPdf = file.mimeType === 'application/pdf'
+              const hasPreview = isImg || isPdf
+              return (
+                <div key={file.fileToken}
+                  className="card-glass"
+                  style={{ padding: 0, overflow: 'hidden', cursor: 'pointer', position: 'relative', transition: 'transform 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.transform='translateY(-2px)'}
+                  onMouseLeave={e => e.currentTarget.style.transform='translateY(0)'}
+                  onClick={() => { if (hasPreview) setPreviewFile(file); else alert(`Preview not available for "${file.fileName}".`) }}>
+                  <div style={{ width: '100%', height: 160, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                    {file.previewData ? (
+                      <img src={file.previewData} alt={file.fileName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                    ) : (
+                      <FileIcon mime={file.mimeType} size={48} />
+                    )}
+                    {selectedCat === 'videos' && (
+                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 12 }}>
+                        <Video size={24} color="#fff" />
+                      </div>
+                    )}
                   </div>
-                  <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>
-                    {fmtSize(file.fileSize)} · {file.mimeType}
+                  <div style={{ padding: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.fileName}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{fmtSize(file.fileSize)}</div>
                   </div>
                 </div>
-                <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-                  <button className="btn btn-ghost btn-sm" style={{ gap:5 }}
-                    onClick={() => { if (hasPreview) setPreviewFile(file); else alert(`Preview not available for "${file.fileName}".`) }}>
-                    <Eye size={13}/> Preview
-                  </button>
-                  <button className="btn btn-primary btn-sm" style={{ gap:5 }} onClick={() => handleDownload(file)}>
-                    <Download size={13}/> Download
-                  </button>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="card" style={{ padding:0, overflow:'hidden' }}>
+            {files.map((file, idx) => {
+              const isImg = file.mimeType?.startsWith('image/')
+              const isPdf = file.mimeType === 'application/pdf'
+              const hasPreview = isImg || isPdf
+              return (
+                <div key={file.fileToken}
+                  style={{ display:'flex', alignItems:'center', gap:14, padding:'13px 18px',
+                    borderBottom:idx<files.length-1?'1px solid var(--border)':'none', transition:'background .15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.03)'}
+                  onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                  <FileIcon mime={file.mimeType} size={22} />
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontWeight:600, fontSize:14, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {file.fileName}
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>
+                      {fmtSize(file.fileSize)} · {file.mimeType}
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                    <button className="btn btn-ghost btn-sm" style={{ gap:5 }}
+                      onClick={() => { if (hasPreview) setPreviewFile(file); else alert(`Preview not available for "${file.fileName}".`) }}>
+                      <Eye size={13}/> Preview
+                    </button>
+                    <button className="btn btn-primary btn-sm" style={{ gap:5 }} onClick={() => handleDownload(file)}>
+                      <Download size={13}/> Download
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )
       )}
 
       {previewFile && (

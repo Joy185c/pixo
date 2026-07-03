@@ -79,10 +79,29 @@ export default function SelectedFilesReviewScreen({ navigation, route }: Props) 
         modifiedAt: f.modifiedAt,
       }));
 
-      // 3. Send metadata to backend
-      await apiClient.post(`/sessions/${sessionId}/files/index`, {
-        files: payloadFiles,
-      });
+      // 3. Send metadata to backend in chunks
+      const CHUNK_SIZE = 500;
+      let totalSaved = 0;
+      console.log(`[Upload] SessionId: ${sessionId}`);
+      console.log(`[Upload] Indexed files count before upload: ${payloadFiles.length}`);
+      console.log(`[Upload] Backend upload endpoint: /sessions/${sessionId}/files/index`);
+
+      for (let i = 0; i < payloadFiles.length; i += CHUNK_SIZE) {
+        const chunk = payloadFiles.slice(i, i + CHUNK_SIZE);
+        try {
+          const res = await apiClient.post(`/sessions/${sessionId}/files/index`, {
+            files: chunk,
+          });
+          console.log(`[Upload] Backend response status: ${res.status}`);
+          if (res.data && res.data.totalIndexed) {
+            totalSaved += res.data.totalIndexed;
+          }
+        } catch (uploadErr: any) {
+          console.error(`[Upload] Error during upload:`, uploadErr.message || uploadErr);
+          throw uploadErr;
+        }
+      }
+      console.log(`[Upload] Backend saved count: ${totalSaved}`);
 
       navigation.navigate('ActiveSession', { session, totalFiles: files.length });
     } catch (err: any) {
