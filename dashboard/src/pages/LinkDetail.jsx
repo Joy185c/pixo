@@ -89,10 +89,72 @@ function DeviceFilesView({ session, userId, onBack }) {
     </div>
   )
 
-  const { totalFiles = 0, categories = {}, files = [], deviceName } = filesData || {}
+  const { totalFiles = 0, categories = {}, files = [], deviceName, hasMore } = filesData || {}
 
-  const handleDownload = (file) => {
-    alert('Full download will be available after secure file transfer is enabled.');
+  const [downloading, setDownloading] = useState(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  const loadMore = useCallback(() => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    let path = selectedCat ? `/sessions/${session.id}/files?category=${selectedCat}&limit=250&offset=${files.length}` : `/sessions/${session.id}/files?limit=250&offset=${files.length}`;
+    if (userId) path = `/admin/users/${userId}` + path;
+    else path = `/dashboard` + path;
+
+    api.get(path).then(data => {
+      setFilesData(prev => ({
+        ...prev,
+        files: [...prev.files, ...data.files],
+        hasMore: data.hasMore
+      }));
+    }).finally(() => setLoadingMore(false));
+  }, [loadingMore, selectedCat, files.length, session.id, userId]);
+
+  const handleDownload = async (file) => {
+    try {
+      setDownloading(file.fileToken)
+      const reqRes = await api.post(`/files/${file.fileToken}/download-request`, {})
+      const requestId = reqRes.requestId
+      
+      const poll = setInterval(async () => {
+        try {
+          const statusRes = await api.get(`/files/download-requests/${requestId}`)
+          if (statusRes.status === 'ready') {
+            clearInterval(poll)
+            setDownloading(null)
+            
+            const a = document.createElement('a')
+            a.href = statusRes.temp_url
+            a.download = file.fileName
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+          } else if (statusRes.status === 'failed' || statusRes.status === 'expired') {
+            clearInterval(poll)
+            setDownloading(null)
+            alert(`Download failed: ${statusRes.error_reason || 'Timeout'}`)
+          }
+        } catch (err) {
+          clearInterval(poll)
+          setDownloading(null)
+          alert('Download error.')
+        }
+      }, 3000)
+      
+      setTimeout(() => {
+        clearInterval(poll)
+        setDownloading(prev => {
+          if (prev === file.fileToken) {
+            alert('Download timed out. Please check if the provider phone is online.')
+            return null
+          }
+          return prev
+        })
+      }, 120000)
+    } catch (err) {
+      setDownloading(null)
+      alert(err.response?.data?.error || 'Failed to request download.')
+    }
   }
 
   /* ── Category Grid ── */
@@ -194,8 +256,8 @@ function DeviceFilesView({ session, userId, onBack }) {
                   onMouseLeave={e => e.currentTarget.style.transform='translateY(0)'}
                   onClick={() => { if (hasPreview) setPreviewFile(file); else alert(`Preview not available for "${file.fileName}".`) }}>
                   <div style={{ width: '100%', height: 160, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                    {file.previewData ? (
-                      <img src={file.previewData} alt={file.fileName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                    {file.previewData || file.thumbnailUrl ? (
+                      <img src={file.thumbnailUrl || file.previewData} alt={file.fileName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                     ) : (
                       <FileIcon mime={file.mimeType} size={48} />
                     )}
@@ -239,8 +301,8 @@ function DeviceFilesView({ session, userId, onBack }) {
                       onClick={() => { if (hasPreview) setPreviewFile(file); else alert(`Preview not available for "${file.fileName}".`) }}>
                       <Eye size={13}/> Preview
                     </button>
-                    <button className="btn btn-primary btn-sm" style={{ gap:5 }} onClick={() => handleDownload(file)}>
-                      <Download size={13}/> Download
+                    <button className="btn btn-primary btn-sm" style={{ gap:5 }} onClick={() => handleDownload(file)} disabled={downloading === file.fileToken}>
+                      <Download size={13}/> {downloading === file.fileToken ? 'Preparing...' : 'Download'}
                     </button>
                   </div>
                 </div>
@@ -248,6 +310,14 @@ function DeviceFilesView({ session, userId, onBack }) {
             })}
           </div>
         )
+      )}
+      
+      {hasMore && (
+        <div style={{ textAlign: 'center', marginTop: 24, paddingBottom: 40 }}>
+          <button className="btn btn-ghost" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? 'Loading more...' : 'Load More'}
+          </button>
+        </div>
       )}
 
       {previewFile && (
@@ -259,8 +329,8 @@ function DeviceFilesView({ session, userId, onBack }) {
             </div>
             {previewFile.mimeType?.startsWith('image/') ? (
               <div style={{ background:'#0a0a14', borderRadius:10, overflow:'hidden', minHeight:200, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                {previewFile.previewData
-                  ? <img src={previewFile.previewData} alt={previewFile.fileName} style={{ width:'100%', height:'auto', maxHeight:400, objectFit:'contain' }} />
+                {previewFile.previewData || previewFile.thumbnailUrl
+                  ? <img src={previewFile.thumbnailUrl || previewFile.previewData} alt={previewFile.fileName} style={{ width:'100%', height:'auto', maxHeight:400, objectFit:'contain' }} />
                   : <div style={{ textAlign:'center', color:'var(--muted)', padding:20 }}>
                       <Image size={48} style={{ marginBottom:12, opacity:0.3 }} />
                       <div style={{ fontSize:13 }}>Image preview not available.</div>
@@ -283,8 +353,8 @@ function DeviceFilesView({ session, userId, onBack }) {
             )}
             <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:16 }}>
               <button className="btn btn-ghost" onClick={() => setPreviewFile(null)}>Close</button>
-              <button className="btn btn-primary" style={{ gap:5 }} onClick={() => handleDownload(previewFile)}>
-                <Download size={14}/> Download
+              <button className="btn btn-primary" style={{ gap:5 }} onClick={() => handleDownload(previewFile)} disabled={downloading === previewFile.fileToken}>
+                <Download size={14}/> {downloading === previewFile.fileToken ? 'Preparing...' : 'Download'}
               </button>
             </div>
           </div>

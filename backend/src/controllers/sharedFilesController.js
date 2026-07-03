@@ -97,13 +97,22 @@ async function indexFiles(req, res) {
             [sessionId, JSON.stringify({ total_files: insertedCount })]
         );
 
+        // Get total saved count for the session
+        const { rows: countRows } = await client.query(
+            `SELECT COUNT(*)::int as total FROM shared_files WHERE session_id = $1`,
+            [sessionId]
+        );
+        const totalSavedForSession = countRows[0].total;
+
         await client.query('COMMIT');
 
-        console.log(`[indexFiles] Session ${sessionId}: indexed ${insertedCount} files.`);
+        console.log(`[indexFiles] Session ${sessionId}: indexed ${insertedCount} files. Total: ${totalSavedForSession}`);
         return res.status(201).json({
             message: `Successfully indexed ${insertedCount} file(s).`,
             sessionId,
-            totalIndexed: insertedCount,
+            savedCount: insertedCount,
+            totalSavedForSession,
+            totalIndexed: insertedCount, // Keep for backward compatibility
         });
 
     } catch (err) {
@@ -117,7 +126,7 @@ async function indexFiles(req, res) {
 
 /**
  * getIndexedFiles
- * GET /api/sessions/:sessionId/files?category=photos
+ * GET /api/sessions/:sessionId/files?category=photos&limit=250&offset=0
  *
  * Requester side calls this to get real indexed file metadata.
  * Optional ?category= filter for a specific category.
@@ -126,6 +135,8 @@ async function indexFiles(req, res) {
 async function getIndexedFiles(req, res) {
     const sessionId = req.params.session_id || req.params.sessionId;
     const { category } = req.query;
+    const limit  = Math.min(parseInt(req.query.limit)  || 250, 1000);
+    const offset = parseInt(req.query.offset) || 0;
 
     // Validate optional category filter
     if (category && !ALLOWED_CATEGORIES.has(category)) {
@@ -156,18 +167,21 @@ async function getIndexedFiles(req, res) {
                 file_size    AS "fileSize",
                 category,
                 preview_data AS "previewData",
+                thumbnail_url AS "thumbnailUrl",
                 modified_at  AS "modifiedAt",
                 created_at   AS "createdAt"
             FROM shared_files
             WHERE session_id   = $1
-              AND is_available = TRUE`;
+              AND is_available = TRUE
+              AND deleted_at IS NULL`;
         const params = [sessionId];
 
         if (category) {
             query += ` AND category = $2`;
             params.push(category);
         }
-        query += ` ORDER BY created_at DESC`;
+        query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        params.push(limit, offset);
 
         const { rows: files } = await pool.query(query, params);
 
@@ -175,15 +189,17 @@ async function getIndexedFiles(req, res) {
         const { rows: catRows } = await pool.query(
             `SELECT category, COUNT(*)::int AS count
              FROM shared_files
-             WHERE session_id = $1 AND is_available = TRUE
+             WHERE session_id = $1 AND is_available = TRUE AND deleted_at IS NULL
              GROUP BY category`,
             [sessionId]
         );
 
         const categories = { photos: 0, videos: 0, pdfs: 0, documents: 0, whatsapp: 0 };
+        let totalFiles = 0;
         for (const row of catRows) {
             if (categories.hasOwnProperty(row.category)) {
                 categories[row.category] = row.count;
+                totalFiles += row.count;
             }
         }
 
@@ -193,9 +209,10 @@ async function getIndexedFiles(req, res) {
             status: session.status,
             expiresAt: session.expires_at,
             allowedPermissions: session.allowed_permissions,
-            totalFiles: files.length,
+            totalFiles,
             categories,
             files,
+            hasMore: files.length === limit,
         });
 
     } catch (err) {
@@ -222,6 +239,7 @@ async function getUserFileSummary(req, res) {
                 (COUNT(*) FILTER (WHERE category = 'whatsapp'))::int     AS whatsapp
             FROM shared_files
             WHERE is_available = TRUE
+              AND deleted_at IS NULL
               AND ($1::uuid IS NULL OR requester_user_id = $1::uuid)
         `, [userId]);
         return res.json({ userId, summary: rows[0] });
@@ -249,7 +267,7 @@ async function getUserFiles(req, res) {
         const baseParams = [userId];
         let catClause = '';
         if (category) { catClause = ` AND category = $2`; baseParams.push(category); }
-        const baseWhere = `WHERE is_available = TRUE AND requester_user_id = $1::uuid${catClause}`;
+        const baseWhere = `WHERE is_available = TRUE AND deleted_at IS NULL AND requester_user_id = $1::uuid${catClause}`;
 
         const { rows: files } = await pool.query(`
             SELECT
@@ -259,6 +277,7 @@ async function getUserFiles(req, res) {
                 file_size    AS "fileSize",
                 category,
                 preview_data AS "previewData",
+                thumbnail_url AS "thumbnailUrl",
                 modified_at  AS "modifiedAt",
                 created_at   AS "createdAt",
                 session_id   AS "sessionId"

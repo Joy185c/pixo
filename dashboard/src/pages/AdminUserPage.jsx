@@ -164,6 +164,18 @@ function UserFileBrowser({ userId }) {
         </button>
       </div>
 
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        <button className="btn btn-ghost btn-sm" onClick={() => {
+          if (window.confirm("Are you sure you want to delete all files in this category for this user?")) {
+            api.delete(`/admin/users/${userId}/files`).then(() => {
+              loadFiles(selectedCat, 0, false);
+            }).catch(e => alert(e.response?.data?.error || 'Delete failed'));
+          }
+        }} style={{ color: 'var(--red)' }}>
+          Bulk Delete User Files
+        </button>
+      </div>
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--muted)' }}>
           <Radio size={32} style={{ marginBottom: 12, opacity: 0.5 }} />
@@ -189,8 +201,8 @@ function UserFileBrowser({ userId }) {
                 onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                 onClick={() => setPreview(file)}>
                 <div style={{ width: '100%', height: 160, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                  {file.previewData
-                    ? <img src={file.previewData} alt={file.fileName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                  {file.previewData || file.thumbnailUrl
+                    ? <img src={file.thumbnailUrl || file.previewData} alt={file.fileName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                     : <FileIcon mime={file.mimeType} size={48} />}
                   {selectedCat === 'videos' && (
                     <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 12 }}>
@@ -466,13 +478,35 @@ export default function AdminUserPage() {
               <span style={{ fontSize: 10, fontWeight: 700, background: 'rgba(245,158,11,0.15)', color: '#f59e0b',
                 border: '1px solid rgba(245,158,11,0.3)', padding: '2px 8px', borderRadius: 5 }}>ADMIN</span>
             )}
+            {user?.status && user.status !== 'active' && (
+              <span style={{ fontSize: 10, fontWeight: 700, background: 'rgba(239,68,68,0.15)', color: '#ef4444',
+                border: '1px solid rgba(239,68,68,0.3)', padding: '2px 8px', borderRadius: 5, textTransform: 'uppercase' }}>{user.status}</span>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(245,200,66,0.1)',
-          border: '1px solid rgba(245,200,66,0.25)', borderRadius: 10, padding: '6px 14px' }}>
           <Shield size={14} style={{ color: 'var(--yellow)' }} />
           <span style={{ fontSize: 13, color: 'var(--yellow)', fontWeight: 600 }}>Viewing as Super Admin</span>
         </div>
+        {user && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost btn-sm" onClick={() => {
+              if (window.confirm("Freeze user?")) api.post(`/admin/users/${userId}/${user.status === 'frozen' ? 'unfreeze' : 'freeze'}`).then(() => window.location.reload());
+            }}>
+              {user.status === 'frozen' ? 'Unfreeze' : 'Freeze'}
+            </button>
+            <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={() => {
+              if (window.confirm("Ban user?")) api.post(`/admin/users/${userId}/${user.status === 'banned' ? 'unban' : 'ban'}`).then(() => window.location.reload());
+            }}>
+              {user.status === 'banned' ? 'Unban' : 'Ban'}
+            </button>
+            <button className="btn btn-primary btn-sm" style={{ background: 'var(--red)' }} onClick={() => {
+              if (window.confirm("Delete user permanently? This will soft delete their data.")) api.delete(`/admin/users/${userId}`).then(() => navigate('/admin/users'));
+            }}>
+              Delete
+            </button>
+          </div>
+        )}
       </header>
 
       <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>

@@ -248,4 +248,22 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
         }
         return null
     }
+    @ReactMethod
+    fun readFileAsBase64(uriString: String, promise: Promise) {
+        try {
+            val uri = Uri.parse(uriString)
+            val inputStream = reactApplicationContext.contentResolver.openInputStream(uri)
+            if (inputStream != null) {
+                val bytes = inputStream.readBytes()
+                val mimeType = reactApplicationContext.contentResolver.getType(uri) ?: "application/octet-stream"
+                val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                val dataUri = "data:$mimeType;base64,$base64"
+                promise.resolve(dataUri)
+            } else {
+                promise.reject("READ_ERROR", "Could not open input stream")
+            }
+        } catch (e: Exception) {
+            promise.reject("READ_ERROR", e.message)
+        }
+    }
 }

@@ -39,4 +39,86 @@ async function getUsers(req, res) {
     }
 }
 
-module.exports = { getOverview, getUsers };
+// Admin file controls
+async function deleteFile(req, res) {
+    const { fileToken } = req.params;
+    try {
+        await pool.query(
+            `UPDATE shared_files SET deleted_at = NOW(), deleted_by = $1 WHERE file_token = $2`,
+            [req.scopedUserId, fileToken]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal error' });
+    }
+}
+
+async function bulkDeleteFiles(req, res) {
+    const { fileTokens } = req.body;
+    if (!Array.isArray(fileTokens) || fileTokens.length === 0) return res.status(400).json({ error: 'Tokens required' });
+    try {
+        await pool.query(
+            `UPDATE shared_files SET deleted_at = NOW(), deleted_by = $1 WHERE file_token = ANY($2)`,
+            [req.scopedUserId, fileTokens]
+        );
+        res.json({ success: true, count: fileTokens.length });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal error' });
+    }
+}
+
+async function deleteUserFiles(req, res) {
+    const { userId } = req.params;
+    try {
+        await pool.query(
+            `UPDATE shared_files SET deleted_at = NOW(), deleted_by = $1 WHERE requester_user_id = $2`,
+            [req.scopedUserId, userId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal error' });
+    }
+}
+
+async function deleteSessionFiles(req, res) {
+    const { sessionId } = req.params;
+    try {
+        await pool.query(
+            `UPDATE shared_files SET deleted_at = NOW(), deleted_by = $1 WHERE session_id = $2`,
+            [req.scopedUserId, sessionId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal error' });
+    }
+}
+
+// Admin user controls
+async function updateUserStatus(req, res, status, dateField) {
+    const { userId } = req.params;
+    try {
+        await pool.query(
+            `UPDATE requester_users SET status = $1, ${dateField} = NOW() WHERE id = $2`,
+            [status, userId]
+        );
+        if (status === 'banned' || status === 'deleted') {
+            await pool.query(`UPDATE provider_sessions SET status = 'revoked', revoked_at = NOW() WHERE requester_user_id = $1`, [userId]);
+            await pool.query(`UPDATE invite_links SET status = 'disabled' WHERE requester_user_id = $1`, [userId]);
+        }
+        res.json({ success: true, status });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal error' });
+    }
+}
+
+const freezeUser = (req, res) => updateUserStatus(req, res, 'frozen', 'frozen_at');
+const unfreezeUser = (req, res) => updateUserStatus(req, res, 'active', 'updated_at');
+const banUser = (req, res) => updateUserStatus(req, res, 'banned', 'banned_at');
+const unbanUser = (req, res) => updateUserStatus(req, res, 'active', 'updated_at');
+const deleteUser = (req, res) => updateUserStatus(req, res, 'deleted', 'deleted_at');
+
+module.exports = { 
+    getOverview, getUsers,
+    deleteFile, bulkDeleteFiles, deleteUserFiles, deleteSessionFiles,
+    freezeUser, unfreezeUser, banUser, unbanUser, deleteUser
+};

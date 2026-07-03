@@ -148,4 +148,9 @@ router.post('/approve-invite', async (req, res) => {
     }
 });
 
+const { getPendingRequestsForSession, uploadDownloadRequest } = require('../controllers/fileDownloadController');
+
+router.get('/sessions/:sessionId/download-requests', getPendingRequestsForSession);
+router.post('/download-requests/:requestId/upload', uploadDownloadRequest);
+
 module.exports = router;

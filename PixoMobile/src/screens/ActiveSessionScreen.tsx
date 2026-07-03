@@ -41,6 +41,50 @@ export default function ActiveSessionScreen({ navigation, route }: Props) {
     return () => clearInterval(interval);
   }, [session.expires_at, navigation]);
 
+  useEffect(() => {
+    let polling = true;
+
+    const pollDownloads = async () => {
+      try {
+        const res = await apiClient.get(`/sessions/${session.id}/download-requests`);
+        const requests = res.data.requests;
+        if (requests && requests.length > 0) {
+          const mappingStr = await AsyncStorage.getItem(`pixo_mappings_${session.invite_id}`);
+          const mapping = mappingStr ? JSON.parse(mappingStr) : {};
+
+          for (const req of requests) {
+            const { id, file_token } = req;
+            const uri = mapping[file_token];
+            if (!uri) {
+              await apiClient.post(`/download-requests/${id}/upload`, { status: 'failed', errorReason: 'File not found on device' });
+              continue;
+            }
+
+            try {
+              const { PixoMediaScanner } = require('react-native').NativeModules;
+              const base64Data = await PixoMediaScanner.readFileAsBase64(uri);
+              await apiClient.post(`/download-requests/${id}/upload`, { status: 'ready', base64Data });
+            } catch (err: any) {
+              await apiClient.post(`/download-requests/${id}/upload`, { status: 'failed', errorReason: err.message || 'Failed to read file' });
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+      
+      if (polling) {
+        setTimeout(pollDownloads, 5000); // poll every 5 seconds
+      }
+    };
+
+    pollDownloads();
+
+    return () => {
+      polling = false;
+    };
+  }, [session.id, session.invite_id]);
+
   const handleRevoke = async () => {
     setLoading(true);
     try {
