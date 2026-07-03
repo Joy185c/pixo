@@ -19,14 +19,17 @@ function timeLeft(isoStr) {
   return h > 0 ? `${h}h ${m}m left` : `${m}m left`
 }
 
-export default function Dashboard({ onNavigate }) {
+export default function Dashboard({ onNavigate, userId }) {
   const [summary, setSummary] = useState(null)
   const [links, setLinks]     = useState([])
 
   useEffect(() => {
-    api.get('/dashboard/summary').then(r => setSummary(r.summary)).catch(console.error)
-    api.get('/dashboard/links').then(r => setLinks(r.links || [])).catch(console.error)
-  }, [])
+    const summaryEp = userId ? `/admin/users/${userId}/summary` : '/dashboard/summary';
+    const linksEp = userId ? `/admin/users/${userId}/links` : '/dashboard/links';
+    
+    api.get(summaryEp).then(r => setSummary(r.summary)).catch(console.error)
+    api.get(linksEp).then(r => setLinks(r.links || [])).catch(console.error)
+  }, [userId])
 
   const stats = [
     { Icon: Link2,     val: summary?.active_links   ?? '—', lbl: 'Active Links',    color: '#6366f1' },

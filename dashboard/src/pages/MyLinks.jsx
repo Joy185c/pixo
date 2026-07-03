@@ -4,13 +4,16 @@ import { api } from '../api.js'
 import { LinkCard } from './Dashboard.jsx'
 import CreateLinkModal from '../components/CreateLinkModal.jsx'
 
-export default function MyLinks({ onNavigate }) {
+export default function MyLinks({ onNavigate, userId }) {
   const [links, setLinks]   = useState([])
   const [modal, setModal]   = useState(false)
   const [filter, setFilter] = useState('all')
 
-  const load = () => api.get('/dashboard/links').then(r => setLinks(r.links || [])).catch(console.error)
-  useEffect(() => { load() }, [])
+  const load = () => {
+    const endpoint = userId ? `/admin/users/${userId}/links` : '/dashboard/links';
+    api.get(endpoint).then(r => setLinks(r.links || [])).catch(console.error)
+  }
+  useEffect(() => { load() }, [userId])
 
   const filtered = filter === 'all' ? links : links.filter(l => l.status === filter)
 
@@ -41,7 +44,7 @@ export default function MyLinks({ onNavigate }) {
             <Link2 size={36} strokeWidth={1.2} style={{ color: 'var(--muted)', opacity: 0.5 }} />
           </div>
           <div className="empty-text">No {filter === 'all' ? '' : filter} links yet.</div>
-          {filter === 'all' && <button className="btn btn-primary btn-sm" style={{ gap: 5 }} onClick={() => setModal(true)}>
+          {filter === 'all' && !userId && <button className="btn btn-primary btn-sm" style={{ gap: 5 }} onClick={() => setModal(true)}>
             <Plus size={13} /> Create your first link
           </button>}
         </div>

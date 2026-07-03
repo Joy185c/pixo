@@ -160,6 +160,18 @@ function AdminPage() {
   return <AdminDashboard />
 }
 
+function AdminUserDashboardPage() {
+  const navigate = useNavigate()
+  const { userId } = useParams()
+  return <Layout title="User Dashboard" sub="Viewing as Super Admin"><MyLinks userId={userId} onNavigate={(p, token) => navigate(token ? `/admin/users/${userId}/links/${token}` : `/${p}`)} /></Layout>
+}
+
+function AdminUserLinkDetailPage() {
+  const navigate = useNavigate()
+  const { userId, token } = useParams()
+  return <Layout title={token} sub="Connected devices (Admin View)"><LinkDetail token={token} userId={userId} onBack={() => navigate(`/admin/users/${userId}`)} /></Layout>
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -174,6 +186,8 @@ export default function App() {
         <Route path="/links/:token" element={<ProtectedRoute><LinkDetailPage /></ProtectedRoute>} />
         
         <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
+        <Route path="/admin/users/:userId" element={<ProtectedRoute adminOnly><AdminUserDashboardPage /></ProtectedRoute>} />
+        <Route path="/admin/users/:userId/links/:token" element={<ProtectedRoute adminOnly><AdminUserLinkDetailPage /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   )

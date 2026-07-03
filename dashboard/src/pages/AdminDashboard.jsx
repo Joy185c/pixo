@@ -34,6 +34,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [page, setPage] = useState('overview');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
   const adminUser = JSON.parse(localStorage.getItem('pixo_user') || '{}');
 
@@ -41,7 +42,10 @@ export default function AdminDashboard() {
     Promise.all([
       api.get('/admin/overview').then(r => setOverview(r.overview)),
       api.get('/admin/users').then(r => setUsers(r.users || [])),
-    ]).catch(console.error).finally(() => setLoading(false));
+    ]).catch(e => {
+      console.error(e);
+      setError('Failed to load admin data');
+    }).finally(() => setLoading(false));
   }, []);
 
   const handleLogout = () => {
@@ -114,6 +118,10 @@ export default function AdminDashboard() {
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--muted)', fontSize: 14 }}>
               Loading platform data...
+            </div>
+          ) : error ? (
+            <div className="empty-state">
+              <div className="empty-text" style={{ color: 'var(--red)' }}>{error}</div>
             </div>
           ) : page === 'overview' ? (
             <OverviewTab overview={overview} users={users} onViewUsers={() => setPage('users')} />
@@ -222,8 +230,13 @@ function UserRow({ user, expanded }) {
         </div>
       )}
 
-      <div style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, minWidth: 80, textAlign: 'right' }}>
+      <div style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, minWidth: 80, textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
         {joinedDate}
+        {expanded && (
+          <Link to={`/admin/users/${user.id}`} className="btn btn-primary" style={{ padding: '4px 10px', fontSize: 12, height: 'auto', minHeight: 28, textDecoration: 'none' }}>
+            View Dashboard
+          </Link>
+        )}
       </div>
     </div>
   );

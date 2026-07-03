@@ -42,7 +42,7 @@ function timeLeft(isoStr) {
 }
 
 /* ─── File Browser ─── */
-function DeviceFilesView({ session, onBack }) {
+function DeviceFilesView({ session, userId, onBack }) {
   const [filesData, setFilesData] = useState(null)
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState('')
@@ -51,13 +51,15 @@ function DeviceFilesView({ session, onBack }) {
 
   const fetchFiles = useCallback((category) => {
     setLoading(true); setError('')
-    const path = category
-      ? `/sessions/${session.id}/files?category=${category}`
-      : `/sessions/${session.id}/files`
+    
+    let path = category ? `/sessions/${session.id}/files?category=${category}` : `/sessions/${session.id}/files`
+    if (userId) path = `/admin/users/${userId}` + path
+    else path = `/dashboard` + path
+
     api.get(path)
       .then(data => { setFilesData(data); setLoading(false) })
       .catch(() => { setError('Failed to fetch files from device.'); setLoading(false) })
-  }, [session.id])
+  }, [session.id, userId])
 
   useEffect(() => { fetchFiles(selectedCat) }, [selectedCat])
 
@@ -293,7 +295,7 @@ function DeviceFilesView({ session, onBack }) {
 }
 
 /* ─── Main LinkDetail ─── */
-export default function LinkDetail({ token, onBack }) {
+export default function LinkDetail({ token, userId, onBack }) {
   const [data, setData]               = useState(null)
   const [tab, setTab]                 = useState('active')
   const [copiedLink, setCopiedLink]   = useState(false)
@@ -303,12 +305,15 @@ export default function LinkDetail({ token, onBack }) {
   const [viewSession, setViewSession] = useState(null)
   const [historySession, setHistorySession] = useState(null)
 
-  const load = () => api.get(`/dashboard/links/${token}`).then(r => setData(r))
-  useEffect(() => { load() }, [token])
+  const load = () => {
+    const ep = userId ? `/admin/users/${userId}/links/${token}` : `/dashboard/links/${token}`;
+    api.get(ep).then(r => setData(r)).catch(console.error)
+  }
+  useEffect(() => { load() }, [token, userId])
 
   if (!data) return <div style={{ padding:40, color:'var(--muted)' }}>Loading…</div>
 
-  if (viewSession) return <DeviceFilesView session={viewSession} onBack={() => setViewSession(null)} />
+  if (viewSession) return <DeviceFilesView session={viewSession} userId={userId} onBack={() => setViewSession(null)} />
 
   const { link, active_sessions = [], expired_sessions = [], revoked_sessions = [] } = data
   const shareLink = getShareLink(link.token)
@@ -447,9 +452,12 @@ export default function LinkDetail({ token, onBack }) {
                 <span className={`badge ${isAct?'badge-green':s.status==='expired'?'badge-red':'badge-muted'}`}>{s.status}</span>
                 {isAct && (
                   <>
-                    <button className="btn btn-ghost btn-sm" style={{ gap:5 }} onClick={() => setViewSession(s)}><Eye size={12}/> View Files</button>
-                    <button className="btn btn-ghost btn-sm" style={{ gap:5 }} onClick={() => setHistorySession(s)}><ScrollText size={12}/> History</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => revoke(s.id)}>Revoke</button>
+                    <button className="btn btn-outline btn-sm" onClick={() => setHistorySession(s)}>
+                      <Clock size={14} /> History
+                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={() => setViewSession(s)}>
+                      View Files <ChevronRight size={14} />
+                    </button>
                   </>
                 )}
               </div>
