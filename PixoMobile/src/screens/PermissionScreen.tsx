@@ -72,7 +72,7 @@ export default function PermissionScreen({ navigation, route }: Props) {
           disabled={selected.length === 0}
           onPress={() => navigation.navigate('FilePicker', { token, permissions: selected })}
         >
-          <Text style={styles.continueText}>Choose Files</Text>
+          <Text style={styles.continueText}>Allow Access</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

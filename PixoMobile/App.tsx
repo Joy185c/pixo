@@ -70,7 +70,7 @@ function App(): React.JSX.Element {
             <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Pixo', headerBackVisible: false }} />
             <Stack.Screen name="ManualInviteCode" component={ManualInviteCodeScreen} options={{ title: 'Enter Invite Code' }} />
             <Stack.Screen name="Permission" component={PermissionScreen} options={{ title: 'Permissions' }} />
-            <Stack.Screen name="FilePicker" component={FilePickerScreen} options={{ title: 'Select Files' }} />
+            <Stack.Screen name="FilePicker" component={FilePickerScreen} options={{ title: 'Scanning Approved Files' }} />
             <Stack.Screen name="SelectedFilesReview" component={SelectedFilesReviewScreen} options={{ title: 'Review Selection' }} />
             <Stack.Screen name="ActiveSession" component={ActiveSessionScreen} options={{ title: 'Active Session', headerBackVisible: false }} />
             <Stack.Screen name="AccessHistory" component={AccessHistoryScreen} options={{ title: 'Access History' }} />

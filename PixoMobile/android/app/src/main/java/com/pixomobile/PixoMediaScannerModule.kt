@@ -5,6 +5,11 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
+import android.util.Log
+import android.os.Build
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import com.facebook.react.bridge.*
 import java.util.UUID
@@ -35,10 +40,19 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
                 MediaStore.MediaColumns.DATE_MODIFIED
             )
 
+            val hasImagePerm = ContextCompat.checkSelfPermission(reactApplicationContext, if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+            val hasVideoPerm = ContextCompat.checkSelfPermission(reactApplicationContext, if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_VIDEO else Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+            
+            Log.d("PixoMediaScanner", "Media permission granted: ${hasImagePerm || hasVideoPerm}")
+            Log.d("PixoMediaScanner", "Android SDK version: ${Build.VERSION.SDK_INT}")
+            Log.d("PixoMediaScanner", "Selected categories: $type")
+
             if (type == "photos") {
                 uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                Log.d("PixoMediaScanner", "Querying MediaStore Images")
             } else if (type == "videos") {
                 uri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+                Log.d("PixoMediaScanner", "Querying MediaStore Videos")
             } else {
                 promise.reject("INVALID_TYPE", "Type must be photos or videos")
                 return
@@ -48,17 +62,33 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
                 uri, projection, null, null, "${MediaStore.MediaColumns.DATE_MODIFIED} DESC"
             )
 
+            var isFirst = true
+            var count = 0
+
             cursor?.use {
                 val idColumn = it.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                 val nameColumn = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                 val mimeTypeColumn = it.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
                 val sizeColumn = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
                 val dateModifiedColumn = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
+                
+                count = it.count
+                if (type == "photos") {
+                    Log.d("PixoMediaScanner", "Images cursor count: $count")
+                } else {
+                    Log.d("PixoMediaScanner", "Videos cursor count: $count")
+                }
 
                 while (it.moveToNext()) {
                     val id = it.getLong(idColumn)
                     val contentUri = Uri.withAppendedPath(uri, id.toString()).toString()
                     val name = it.getString(nameColumn) ?: "unnamed"
+                    
+                    if (isFirst) {
+                        Log.d("PixoMediaScanner", "First file name: $name")
+                        isFirst = false
+                    }
+
                     val mimeType = it.getString(mimeTypeColumn) ?: "application/octet-stream"
                     val size = it.getLong(sizeColumn)
                     val dateModified = it.getLong(dateModifiedColumn) * 1000 // Convert to ms
@@ -75,6 +105,7 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
                     fileList.pushMap(fileMap)
                 }
             }
+            Log.d("PixoMediaScanner", "Total indexed files: $count")
             promise.resolve(fileList)
         } catch (e: Exception) {
             promise.reject("SCAN_ERROR", e.message)
