@@ -11,6 +11,8 @@ import MyLinks from './pages/MyLinks'
 import LinkDetail from './pages/LinkDetail'
 import CreateLinkModal from './components/CreateLinkModal'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminUserPage from './pages/AdminUserPage'
+import AdminFilesPage from './pages/AdminFilesPage'
 
 // Premium Pixo Logo Icon
 function PixoLogo({ size = 36 }) {
@@ -160,12 +162,6 @@ function AdminPage() {
   return <AdminDashboard />
 }
 
-function AdminUserDashboardPage() {
-  const navigate = useNavigate()
-  const { userId } = useParams()
-  return <Layout title="User Dashboard" sub="Viewing as Super Admin"><MyLinks userId={userId} onNavigate={(p, token) => navigate(token ? `/admin/users/${userId}/links/${token}` : `/${p}`)} /></Layout>
-}
-
 function AdminUserLinkDetailPage() {
   const navigate = useNavigate()
   const { userId, token } = useParams()
@@ -186,7 +182,8 @@ export default function App() {
         <Route path="/links/:token" element={<ProtectedRoute><LinkDetailPage /></ProtectedRoute>} />
         
         <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
-        <Route path="/admin/users/:userId" element={<ProtectedRoute adminOnly><AdminUserDashboardPage /></ProtectedRoute>} />
+        <Route path="/admin/files" element={<ProtectedRoute adminOnly><AdminFilesPage /></ProtectedRoute>} />
+        <Route path="/admin/users/:userId" element={<ProtectedRoute adminOnly><AdminUserPage /></ProtectedRoute>} />
         <Route path="/admin/users/:userId/links/:token" element={<ProtectedRoute adminOnly><AdminUserLinkDetailPage /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>

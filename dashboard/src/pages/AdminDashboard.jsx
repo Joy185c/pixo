@@ -17,14 +17,19 @@ function PixoLogo({ size = 32 }) {
   );
 }
 
-function StatCard({ icon: Icon, value, label, color }) {
+function StatCard({ icon: Icon, value, label, color, onClick }) {
   return (
-    <div className="stat-card">
+    <div className="stat-card"
+      onClick={onClick}
+      style={{ cursor: onClick ? 'pointer' : 'default', transition: 'transform 0.15s, border-color 0.15s' }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.transform = 'translateY(-2px)'; }}
+      onMouseLeave={e => { if (onClick) e.currentTarget.style.transform = 'translateY(0)'; }}
+    >
       <div className="stat-icon" style={{ background: `${color}18`, color }}>
         <Icon size={20} strokeWidth={1.8} />
       </div>
       <div className="stat-val">{value ?? '—'}</div>
-      <div className="stat-lbl">{label}</div>
+      <div className="stat-lbl">{label}{onClick && <span style={{ fontSize: 10, marginLeft: 5, opacity: 0.6 }}>↗</span>}</div>
     </div>
   );
 }
@@ -124,7 +129,9 @@ export default function AdminDashboard() {
               <div className="empty-text" style={{ color: 'var(--red)' }}>{error}</div>
             </div>
           ) : page === 'overview' ? (
-            <OverviewTab overview={overview} users={users} onViewUsers={() => setPage('users')} />
+            <OverviewTab overview={overview} users={users}
+              onViewUsers={() => setPage('users')}
+              onViewFiles={() => navigate('/admin/files')} />
           ) : (
             <UsersTab users={users} />
           )}
@@ -134,13 +141,14 @@ export default function AdminDashboard() {
   );
 }
 
-function OverviewTab({ overview, users, onViewUsers }) {
+function OverviewTab({ overview, users, onViewUsers, onViewFiles }) {
+  const navigate = useNavigate();
   const stats = [
-    { icon: Users,      value: overview?.total_users,    label: 'Total Users',    color: '#6366f1' },
-    { icon: Link2,      value: overview?.total_links,    label: 'Total Links',    color: '#8b5cf6' },
-    { icon: Smartphone, value: overview?.total_sessions, label: 'Total Sessions', color: '#06b6d4' },
-    { icon: Activity,   value: overview?.active_sessions,label: 'Active Sessions',color: '#10b981' },
-    { icon: FileText,   value: overview?.total_files,    label: 'Total Files',    color: '#f59e0b' },
+    { icon: Users,      value: overview?.total_users,     label: 'Total Users',    color: '#6366f1', onClick: onViewUsers },
+    { icon: Link2,      value: overview?.total_links,     label: 'Total Links',    color: '#8b5cf6' },
+    { icon: Smartphone, value: overview?.total_sessions,  label: 'Total Sessions', color: '#06b6d4' },
+    { icon: Activity,   value: overview?.active_sessions, label: 'Active Sessions',color: '#10b981' },
+    { icon: FileText,   value: overview?.total_files,     label: 'Total Files',    color: '#f59e0b', onClick: onViewFiles },
   ];
 
   return (
@@ -240,9 +248,14 @@ function UserRow({ user, expanded }) {
       <div style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0, minWidth: 80, textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
         {joinedDate}
         {expanded && (
-          <Link to={`/admin/users/${user.id}`} className="btn btn-primary" style={{ padding: '4px 10px', fontSize: 12, height: 'auto', minHeight: 28, textDecoration: 'none' }}>
-            View Dashboard
-          </Link>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <Link to={`/admin/users/${user.id}?tab=files`} className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 12, height: 'auto', minHeight: 28, textDecoration: 'none', background: 'rgba(255,255,255,0.05)' }}>
+              View Files
+            </Link>
+            <Link to={`/admin/users/${user.id}`} className="btn btn-primary" style={{ padding: '4px 10px', fontSize: 12, height: 'auto', minHeight: 28, textDecoration: 'none' }}>
+              View Dashboard
+            </Link>
+          </div>
         )}
       </div>
     </div>

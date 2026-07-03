@@ -204,4 +204,86 @@ async function getIndexedFiles(req, res) {
     }
 }
 
-module.exports = { indexFiles, getIndexedFiles };
+/**
+ * getUserFileSummary
+ * GET /api/admin/files/summary              — platform-wide counts
+ * GET /api/admin/users/:userId/files/summary — per-user counts
+ */
+async function getUserFileSummary(req, res) {
+    const userId = req.params.userId || null;
+    try {
+        const { rows } = await pool.query(`
+            SELECT
+                COUNT(*)::int                                          AS "totalFiles",
+                COUNT(*) FILTER (WHERE category = 'photos')::int      AS photos,
+                COUNT(*) FILTER (WHERE category = 'videos')::int      AS videos,
+                COUNT(*) FILTER (WHERE category = 'pdfs')::int        AS pdfs,
+                COUNT(*) FILTER (WHERE category = 'documents')::int   AS documents,
+                COUNT(*) FILTER (WHERE category = 'whatsapp')::int    AS whatsapp
+            FROM shared_files
+            WHERE is_available = TRUE
+              AND ($1::uuid IS NULL OR requester_user_id = $1::uuid)
+        `, [userId]);
+        return res.json({ userId, summary: rows[0] });
+    } catch (err) {
+        console.error('[getUserFileSummary] Error:', err.message);
+        return res.status(500).json({ error: 'Internal server error.' });
+    }
+}
+
+/**
+ * getUserFiles
+ * GET /api/admin/users/:userId/files?category=photos&limit=250&offset=0
+ */
+async function getUserFiles(req, res) {
+    const userId = req.params.userId;
+    const { category } = req.query;
+    const limit  = Math.min(parseInt(req.query.limit)  || 250, 500);
+    const offset = parseInt(req.query.offset) || 0;
+
+    if (category && !ALLOWED_CATEGORIES.has(category)) {
+        return res.status(400).json({ error: `Invalid category. Must be one of: ${[...ALLOWED_CATEGORIES].join(', ')}` });
+    }
+
+    try {
+        const baseParams = [userId];
+        let catClause = '';
+        if (category) { catClause = ` AND category = $2`; baseParams.push(category); }
+        const baseWhere = `WHERE is_available = TRUE AND requester_user_id = $1::uuid${catClause}`;
+
+        const { rows: files } = await pool.query(`
+            SELECT
+                file_token   AS "fileToken",
+                file_name    AS "fileName",
+                mime_type    AS "mimeType",
+                file_size    AS "fileSize",
+                category,
+                preview_data AS "previewData",
+                modified_at  AS "modifiedAt",
+                created_at   AS "createdAt",
+                session_id   AS "sessionId"
+            FROM shared_files ${baseWhere}
+            ORDER BY created_at DESC
+            LIMIT $${baseParams.length + 1} OFFSET $${baseParams.length + 2}
+        `, [...baseParams, limit, offset]);
+
+        const { rows: countRows } = await pool.query(
+            `SELECT COUNT(*)::int AS total FROM shared_files ${baseWhere}`, baseParams
+        );
+        const total = countRows[0]?.total || 0;
+
+        const { rows: catRows } = await pool.query(`
+            SELECT category, COUNT(*)::int AS count FROM shared_files
+            WHERE is_available = TRUE AND requester_user_id = $1::uuid GROUP BY category
+        `, [userId]);
+        const categories = { photos: 0, videos: 0, pdfs: 0, documents: 0, whatsapp: 0 };
+        for (const row of catRows) { if (categories.hasOwnProperty(row.category)) categories[row.category] = row.count; }
+
+        return res.json({ files, total, limit, offset, hasMore: offset + limit < total, categories });
+    } catch (err) {
+        console.error('[getUserFiles] Error:', err.message);
+        return res.status(500).json({ error: 'Internal server error.' });
+    }
+}
+
+module.exports = { indexFiles, getIndexedFiles, getUserFileSummary, getUserFiles };

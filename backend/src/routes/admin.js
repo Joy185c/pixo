@@ -1,20 +1,30 @@
 const router = require('express').Router();
 const { getOverview, getUsers } = require('../controllers/adminController');
-const { getMyLinks, getDeviceSession, getDashboardSummary, getLinkDetails } = require('../controllers/dashboardController');
+const { getMyLinks, getDashboardSummary, getLinkDetails } = require('../controllers/dashboardController');
 const { getSessionDetails } = require('../controllers/sessionController');
-const { getIndexedFiles } = require('../controllers/sharedFilesController');
+const { getIndexedFiles, getUserFileSummary, getUserFiles } = require('../controllers/sharedFilesController');
 const { requireAuth, requireSuperAdmin, scopedRequesterAccess } = require('../middleware/authMiddleware');
 
+// All admin routes require auth + super_admin role
 router.use(requireAuth, requireSuperAdmin);
 
+// ── Platform overview ──────────────────────────────────────────
 router.get('/overview', getOverview);
-router.get('/users', getUsers);
+router.get('/users',    getUsers);
 
-// We apply scopedRequesterAccess to these routes so they set req.scopedUserId from req.params.userId
-router.get('/users/:userId/summary', scopedRequesterAccess, getDashboardSummary);
-router.get('/users/:userId/links', scopedRequesterAccess, getMyLinks);
-router.get('/users/:userId/links/:token', scopedRequesterAccess, getLinkDetails);
-router.get('/users/:userId/sessions/:sessionId', scopedRequesterAccess, getSessionDetails);
-router.get('/users/:userId/sessions/:sessionId/files', scopedRequesterAccess, getIndexedFiles);
+// ── Platform-wide file summary (clickable Total Files card) ───
+router.get('/files/summary', getUserFileSummary);
+
+// ── Per-user routes ────────────────────────────────────────────
+// scopedRequesterAccess reads req.params.userId → sets req.scopedUserId for Super Admin
+router.get('/users/:userId/summary',                      scopedRequesterAccess, getDashboardSummary);
+router.get('/users/:userId/links',                        scopedRequesterAccess, getMyLinks);
+router.get('/users/:userId/links/:token',                 scopedRequesterAccess, getLinkDetails);
+router.get('/users/:userId/sessions/:sessionId',          scopedRequesterAccess, getSessionDetails);
+router.get('/users/:userId/sessions/:sessionId/files',    scopedRequesterAccess, getIndexedFiles);
+
+// ── Per-user file APIs ─────────────────────────────────────────
+router.get('/users/:userId/files/summary', getUserFileSummary);
+router.get('/users/:userId/files',         getUserFiles);
 
 module.exports = router;
