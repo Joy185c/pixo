@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Image, Video, FileText, File, MessageCircle, Folder,
   Download, Eye, RefreshCw, Smartphone, Clock, Copy,
-  Share2, QrCode, Ban, Shield, ChevronLeft, Wifi,
+  Share2, QrCode, Ban, Shield, ChevronLeft, ChevronRight, Wifi,
   AlertTriangle, CheckCircle, Radio, ScrollText, X
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
@@ -43,19 +43,22 @@ function timeLeft(isoStr) {
 
 /* ─── File Browser ─── */
 function DeviceFilesView({ session, userId, onBack }) {
-  const [filesData, setFilesData] = useState(null)
-  const [loading, setLoading]     = useState(true)
-  const [error, setError]         = useState('')
+  // ✅ ALL hooks MUST be at top — before any conditional returns
+  const [filesData, setFilesData]     = useState(null)
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState('')
   const [selectedCat, setSelectedCat] = useState(null)
   const [previewFile, setPreviewFile] = useState(null)
+  const [downloading, setDownloading] = useState(null)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   const fetchFiles = useCallback((category) => {
     setLoading(true); setError('')
-    
-    let path = category ? `/sessions/${session.id}/files?category=${category}` : `/sessions/${session.id}/files`
+    let path = category
+      ? `/sessions/${session.id}/files?category=${category}&limit=250&offset=0`
+      : `/sessions/${session.id}/files?limit=250&offset=0`
     if (userId) path = `/admin/users/${userId}` + path
-    else path = `/dashboard` + path
-
+    else        path = `/dashboard` + path
     api.get(path)
       .then(data => { setFilesData(data); setLoading(false) })
       .catch(() => { setError('Failed to fetch files from device.'); setLoading(false) })
@@ -63,15 +66,63 @@ function DeviceFilesView({ session, userId, onBack }) {
 
   useEffect(() => { fetchFiles(selectedCat) }, [selectedCat])
 
-  const tl = timeLeft(session.expires_at)
+  const loadMore = useCallback(() => {
+    if (loadingMore) return
+    const curFiles = filesData?.files || []
+    setLoadingMore(true)
+    let path = selectedCat
+      ? `/sessions/${session.id}/files?category=${selectedCat}&limit=250&offset=${curFiles.length}`
+      : `/sessions/${session.id}/files?limit=250&offset=${curFiles.length}`
+    if (userId) path = `/admin/users/${userId}` + path
+    else        path = `/dashboard` + path
+    api.get(path).then(data => {
+      setFilesData(prev => ({
+        ...prev,
+        files: [...(prev?.files || []), ...data.files],
+        hasMore: data.hasMore
+      }))
+    }).catch(() => {}).finally(() => setLoadingMore(false))
+  }, [loadingMore, selectedCat, filesData?.files?.length, session.id, userId])
 
+  const handleDownload = async (file) => {
+    try {
+      setDownloading(file.fileToken)
+      const reqRes = await api.post(`/files/${file.fileToken}/download-request`, {})
+      const requestId = reqRes.requestId
+      const poll = setInterval(async () => {
+        try {
+          const st = await api.get(`/files/download-requests/${requestId}`)
+          if (st.status === 'ready') {
+            clearInterval(poll); setDownloading(null)
+            const a = document.createElement('a')
+            a.href = st.temp_url; a.download = file.fileName
+            document.body.appendChild(a); a.click(); document.body.removeChild(a)
+          } else if (st.status === 'failed' || st.status === 'expired') {
+            clearInterval(poll); setDownloading(null)
+            alert(`Download failed: ${st.error_reason || 'Provider offline'}`)
+          }
+        } catch { clearInterval(poll); setDownloading(null); alert('Download error.') }
+      }, 3000)
+      setTimeout(() => {
+        clearInterval(poll)
+        setDownloading(prev => { if (prev === file.fileToken) { alert('Timed out. Is the provider phone online?'); return null } return prev })
+      }, 120000)
+    } catch (err) {
+      setDownloading(null)
+      alert(err?.message || 'Failed to request download.')
+    }
+  }
+
+  const tl = timeLeft(session?.expires_at)
+
+  // ✅ Conditional rendering AFTER all hooks
   if (loading) return (
     <div className="fade-in">
       <button className="back-btn" onClick={onBack}><ChevronLeft size={14}/> Back to device list</button>
       <div style={{ textAlign:'center', padding:60, color:'var(--muted)' }}>
         <Radio size={36} style={{ marginBottom:12, opacity:0.5 }} />
-        <div style={{ fontWeight:600 }}>Fetching real files from device…</div>
-        <div style={{ fontSize:12, marginTop:6 }}>Connecting to {session.provider_device_name}</div>
+        <div style={{ fontWeight:600 }}>Fetching files from device…</div>
+        <div style={{ fontSize:12, marginTop:6 }}>Connecting to {session?.provider_device_name}</div>
       </div>
     </div>
   )
@@ -91,82 +142,15 @@ function DeviceFilesView({ session, userId, onBack }) {
 
   const { totalFiles = 0, categories = {}, files = [], deviceName, hasMore } = filesData || {}
 
-  const [downloading, setDownloading] = useState(null)
-  const [loadingMore, setLoadingMore] = useState(false)
-
-  const loadMore = useCallback(() => {
-    if (loadingMore) return;
-    setLoadingMore(true);
-    let path = selectedCat ? `/sessions/${session.id}/files?category=${selectedCat}&limit=250&offset=${files.length}` : `/sessions/${session.id}/files?limit=250&offset=${files.length}`;
-    if (userId) path = `/admin/users/${userId}` + path;
-    else path = `/dashboard` + path;
-
-    api.get(path).then(data => {
-      setFilesData(prev => ({
-        ...prev,
-        files: [...prev.files, ...data.files],
-        hasMore: data.hasMore
-      }));
-    }).finally(() => setLoadingMore(false));
-  }, [loadingMore, selectedCat, files.length, session.id, userId]);
-
-  const handleDownload = async (file) => {
-    try {
-      setDownloading(file.fileToken)
-      const reqRes = await api.post(`/files/${file.fileToken}/download-request`, {})
-      const requestId = reqRes.requestId
-      
-      const poll = setInterval(async () => {
-        try {
-          const statusRes = await api.get(`/files/download-requests/${requestId}`)
-          if (statusRes.status === 'ready') {
-            clearInterval(poll)
-            setDownloading(null)
-            
-            const a = document.createElement('a')
-            a.href = statusRes.temp_url
-            a.download = file.fileName
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-          } else if (statusRes.status === 'failed' || statusRes.status === 'expired') {
-            clearInterval(poll)
-            setDownloading(null)
-            alert(`Download failed: ${statusRes.error_reason || 'Timeout'}`)
-          }
-        } catch (err) {
-          clearInterval(poll)
-          setDownloading(null)
-          alert('Download error.')
-        }
-      }, 3000)
-      
-      setTimeout(() => {
-        clearInterval(poll)
-        setDownloading(prev => {
-          if (prev === file.fileToken) {
-            alert('Download timed out. Please check if the provider phone is online.')
-            return null
-          }
-          return prev
-        })
-      }, 120000)
-    } catch (err) {
-      setDownloading(null)
-      alert(err.response?.data?.error || 'Failed to request download.')
-    }
-  }
-
   /* ── Category Grid ── */
   if (!selectedCat) return (
     <div className="fade-in">
       <button className="back-btn" onClick={onBack}><ChevronLeft size={14}/> Back to device list</button>
-
       <div className="card" style={{ marginBottom:20 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div>
             <div style={{ fontSize:11, color:'var(--muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:0.5 }}>Connected Device</div>
-            <div style={{ fontSize:22, fontWeight:800, marginTop:4 }}>{deviceName}</div>
+            <div style={{ fontSize:22, fontWeight:800, marginTop:4 }}>{deviceName || session?.provider_device_name}</div>
           </div>
           <div style={{ textAlign:'right' }}>
             <span className="badge badge-green" style={{ display:'block', marginBottom:4 }}>● Active</span>
@@ -177,7 +161,7 @@ function DeviceFilesView({ session, userId, onBack }) {
         </div>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:14, paddingTop:14, borderTop:'1px solid var(--border)' }}>
           <span style={{ fontSize:13, color:'var(--muted)' }}>
-            {totalFiles === 0 ? 'No files shared yet' : `${totalFiles} file${totalFiles!==1?'s':''} indexed`}
+            {totalFiles === 0 ? 'No files shared yet' : `${totalFiles.toLocaleString()} file${totalFiles!==1?'s':''} indexed`}
           </span>
           <button className="btn btn-ghost btn-sm" style={{ gap:5 }} onClick={() => fetchFiles(null)}>
             <RefreshCw size={12}/> Refresh
@@ -189,6 +173,7 @@ function DeviceFilesView({ session, userId, onBack }) {
         <div className="empty-state">
           <div className="empty-icon"><Folder size={36} strokeWidth={1.2} style={{ opacity:0.4 }} /></div>
           <div className="empty-text">No approved files available yet.</div>
+          <div style={{ fontSize:13, color:'var(--muted)', marginTop:4 }}>Provider needs to open the app and approve access.</div>
         </div>
       ) : (
         <div>
@@ -206,7 +191,7 @@ function DeviceFilesView({ session, userId, onBack }) {
                       display:'flex', alignItems:'center', justifyContent:'center' }}>
                       <meta.Icon size={20} style={{ color:meta.color }} />
                     </div>
-                    <span className={`badge ${count>0?'badge-green':'badge-muted'}`}>{count} files</span>
+                    <span className={`badge ${count>0?'badge-green':'badge-muted'}`}>{count.toLocaleString()} files</span>
                   </div>
                   <div style={{ fontWeight:700, fontSize:15 }}>{meta.label}</div>
                   <div style={{ fontSize:11, color:'var(--muted)', marginTop:4 }}>{meta.desc}</div>
@@ -221,6 +206,7 @@ function DeviceFilesView({ session, userId, onBack }) {
 
   /* ── File List ── */
   const catMeta = CATEGORY_META[selectedCat] || {}
+  const isMedia = selectedCat === 'photos' || selectedCat === 'videos'
   return (
     <div className="fade-in">
       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
@@ -229,8 +215,11 @@ function DeviceFilesView({ session, userId, onBack }) {
         </button>
         <h3 style={{ fontSize:16, fontWeight:700, display:'flex', alignItems:'center', gap:6 }}>
           {catMeta.Icon && <catMeta.Icon size={16} style={{ color:catMeta.color }} />}
-          {catMeta.label} ({files.length})
+          {catMeta.label}
         </h3>
+        <span style={{ fontSize:12, color:'var(--muted)', marginLeft:4 }}>
+          Showing {files.length.toLocaleString()} of {(filesData?.totalFiles || files.length).toLocaleString()}
+        </span>
         <button className="btn btn-ghost btn-sm" style={{ marginLeft:'auto', gap:5 }} onClick={() => fetchFiles(selectedCat)}>
           <RefreshCw size={12}/> Refresh
         </button>
@@ -239,83 +228,72 @@ function DeviceFilesView({ session, userId, onBack }) {
       {files.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">{catMeta.Icon && <catMeta.Icon size={36} strokeWidth={1.2} style={{ opacity:0.4 }} />}</div>
-          <div className="empty-text">No approved files available yet.</div>
+          <div className="empty-text">No files in this category.</div>
+        </div>
+      ) : isMedia ? (
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px,1fr))', gap:16 }}>
+          {files.map(file => (
+            <div key={file.fileToken} className="card-glass"
+              style={{ padding:0, overflow:'hidden', cursor:'pointer', position:'relative', transition:'transform 0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.transform='translateY(-2px)'}
+              onMouseLeave={e => e.currentTarget.style.transform='translateY(0)'}
+              onClick={() => setPreviewFile(file)}>
+              <div style={{ width:'100%', height:160, background:'#111', display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+                {file.previewData || file.thumbnailUrl ? (
+                  <img
+                    src={file.thumbnailUrl || file.previewData}
+                    alt={file.fileName}
+                    style={{ width:'100%', height:'100%', objectFit:'cover' }}
+                    loading="lazy"
+                    onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex' }}
+                  />
+                ) : null}
+                <div style={{ display: (file.previewData || file.thumbnailUrl) ? 'none' : 'flex', width:'100%', height:'100%', alignItems:'center', justifyContent:'center' }}>
+                  <FileIcon mime={file.mimeType} size={48} />
+                </div>
+                {selectedCat === 'videos' && (
+                  <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', background:'rgba(0,0,0,0.6)', borderRadius:'50%', padding:12, pointerEvents:'none' }}>
+                    <Video size={24} color="#fff" />
+                  </div>
+                )}
+              </div>
+              <div style={{ padding:12 }}>
+                <div style={{ fontSize:13, fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{file.fileName}</div>
+                <div style={{ fontSize:11, color:'var(--muted)', marginTop:4 }}>{fmtSize(file.fileSize)}</div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
-        selectedCat === 'photos' || selectedCat === 'videos' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
-            {files.map((file, idx) => {
-              const isImg = file.mimeType?.startsWith('image/')
-              const isPdf = file.mimeType === 'application/pdf'
-              const hasPreview = isImg || isPdf
-              return (
-                <div key={file.fileToken}
-                  className="card-glass"
-                  style={{ padding: 0, overflow: 'hidden', cursor: 'pointer', position: 'relative', transition: 'transform 0.2s' }}
-                  onMouseEnter={e => e.currentTarget.style.transform='translateY(-2px)'}
-                  onMouseLeave={e => e.currentTarget.style.transform='translateY(0)'}
-                  onClick={() => { if (hasPreview) setPreviewFile(file); else alert(`Preview not available for "${file.fileName}".`) }}>
-                  <div style={{ width: '100%', height: 160, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                    {file.previewData || file.thumbnailUrl ? (
-                      <img src={file.thumbnailUrl || file.previewData} alt={file.fileName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
-                    ) : (
-                      <FileIcon mime={file.mimeType} size={48} />
-                    )}
-                    {selectedCat === 'videos' && (
-                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 12 }}>
-                        <Video size={24} color="#fff" />
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ padding: 12 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.fileName}</div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{fmtSize(file.fileSize)}</div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="card" style={{ padding:0, overflow:'hidden' }}>
-            {files.map((file, idx) => {
-              const isImg = file.mimeType?.startsWith('image/')
-              const isPdf = file.mimeType === 'application/pdf'
-              const hasPreview = isImg || isPdf
-              return (
-                <div key={file.fileToken}
-                  style={{ display:'flex', alignItems:'center', gap:14, padding:'13px 18px',
-                    borderBottom:idx<files.length-1?'1px solid var(--border)':'none', transition:'background .15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.03)'}
-                  onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                  <FileIcon mime={file.mimeType} size={22} />
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontWeight:600, fontSize:14, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                      {file.fileName}
-                    </div>
-                    <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>
-                      {fmtSize(file.fileSize)} · {file.mimeType}
-                    </div>
-                  </div>
-                  <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-                    <button className="btn btn-ghost btn-sm" style={{ gap:5 }}
-                      onClick={() => { if (hasPreview) setPreviewFile(file); else alert(`Preview not available for "${file.fileName}".`) }}>
-                      <Eye size={13}/> Preview
-                    </button>
-                    <button className="btn btn-primary btn-sm" style={{ gap:5 }} onClick={() => handleDownload(file)} disabled={downloading === file.fileToken}>
-                      <Download size={13}/> {downloading === file.fileToken ? 'Preparing...' : 'Download'}
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )
+        <div className="card" style={{ padding:0, overflow:'hidden' }}>
+          {files.map((file, idx) => (
+            <div key={file.fileToken}
+              style={{ display:'flex', alignItems:'center', gap:14, padding:'13px 18px',
+                borderBottom:idx<files.length-1?'1px solid var(--border)':'none', transition:'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.03)'}
+              onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+              <FileIcon mime={file.mimeType} size={22} />
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontWeight:600, fontSize:14, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{file.fileName}</div>
+                <div style={{ fontSize:11, color:'var(--muted)', marginTop:2 }}>{fmtSize(file.fileSize)} · {file.mimeType}</div>
+              </div>
+              <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                <button className="btn btn-ghost btn-sm" style={{ gap:5 }} onClick={() => setPreviewFile(file)}>
+                  <Eye size={13}/> Preview
+                </button>
+                <button className="btn btn-primary btn-sm" style={{ gap:5 }} onClick={() => handleDownload(file)} disabled={downloading === file.fileToken}>
+                  <Download size={13}/> {downloading === file.fileToken ? 'Preparing...' : 'Download'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
-      
+
       {hasMore && (
-        <div style={{ textAlign: 'center', marginTop: 24, paddingBottom: 40 }}>
+        <div style={{ textAlign:'center', marginTop:24, paddingBottom:40 }}>
           <button className="btn btn-ghost" onClick={loadMore} disabled={loadingMore}>
-            {loadingMore ? 'Loading more...' : 'Load More'}
+            {loadingMore ? 'Loading more...' : `Load More (${(filesData?.totalFiles || 0) - files.length} remaining)`}
           </button>
         </div>
       )}
@@ -330,32 +308,28 @@ function DeviceFilesView({ session, userId, onBack }) {
             {previewFile.mimeType?.startsWith('image/') ? (
               <div style={{ background:'#0a0a14', borderRadius:10, overflow:'hidden', minHeight:200, display:'flex', alignItems:'center', justifyContent:'center' }}>
                 {previewFile.previewData || previewFile.thumbnailUrl
-                  ? <img src={previewFile.thumbnailUrl || previewFile.previewData} alt={previewFile.fileName} style={{ width:'100%', height:'auto', maxHeight:400, objectFit:'contain' }} />
+                  ? <img src={previewFile.thumbnailUrl || previewFile.previewData} alt={previewFile.fileName}
+                      style={{ width:'100%', height:'auto', maxHeight:400, objectFit:'contain' }} />
                   : <div style={{ textAlign:'center', color:'var(--muted)', padding:20 }}>
                       <Image size={48} style={{ marginBottom:12, opacity:0.3 }} />
-                      <div style={{ fontSize:13 }}>Image preview not available.</div>
+                      <div style={{ fontSize:13 }}>Preview not available — download to view full image.</div>
                     </div>
                 }
               </div>
             ) : (
-              <div style={{ background:'#f8f8f8', borderRadius:10, padding:24, color:'#333', minHeight:200 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, borderBottom:'1px solid #ddd', paddingBottom:12 }}>
-                  <FileText size={28} style={{ color:'#f97316' }} />
-                  <div>
-                    <div style={{ fontWeight:700 }}>{previewFile.fileName}</div>
-                    <div style={{ fontSize:11, color:'#666' }}>{fmtSize(previewFile.fileSize)}</div>
-                  </div>
-                </div>
-                <div style={{ textAlign:'center', color:'#777', fontSize:13, padding:20, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                  <Shield size={14}/> Secure preview requires provider app agent connection.
-                </div>
+              <div style={{ background:'rgba(255,255,255,0.03)', borderRadius:10, padding:24, minHeight:120, display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:10 }}>
+                <FileIcon mime={previewFile.mimeType} size={48} />
+                <div style={{ fontSize:13, color:'var(--muted)' }}>{fmtSize(previewFile.fileSize)} · {previewFile.mimeType}</div>
               </div>
             )}
-            <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginTop:16 }}>
-              <button className="btn btn-ghost" onClick={() => setPreviewFile(null)}>Close</button>
-              <button className="btn btn-primary" style={{ gap:5 }} onClick={() => handleDownload(previewFile)} disabled={downloading === previewFile.fileToken}>
-                <Download size={14}/> {downloading === previewFile.fileToken ? 'Preparing...' : 'Download'}
-              </button>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:16 }}>
+              <div style={{ fontSize:12, color:'var(--muted)' }}>Size: {fmtSize(previewFile.fileSize)} · Type: {previewFile.mimeType || '—'}</div>
+              <div style={{ display:'flex', gap:8 }}>
+                <button className="btn btn-ghost" onClick={() => setPreviewFile(null)}>Close</button>
+                <button className="btn btn-primary" style={{ gap:5 }} onClick={() => handleDownload(previewFile)} disabled={downloading === previewFile.fileToken}>
+                  <Download size={14}/> {downloading === previewFile.fileToken ? 'Preparing...' : 'Download'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -363,6 +337,7 @@ function DeviceFilesView({ session, userId, onBack }) {
     </div>
   )
 }
+
 
 /* ─── Main LinkDetail ─── */
 export default function LinkDetail({ token, userId, onBack }) {
