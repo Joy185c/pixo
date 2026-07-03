@@ -90,12 +90,7 @@ function DeviceFilesView({ session, onBack }) {
   const { totalFiles = 0, categories = {}, files = [], deviceName } = filesData || {}
 
   const handleDownload = (file) => {
-    if (file.previewData) {
-      const a = document.createElement('a'); a.href = file.previewData
-      a.download = file.fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a)
-    } else {
-      alert(`Download request sent for "${file.fileName}".`)
-    }
+    alert('Full download will be available after secure file transfer is enabled.');
   }
 
   /* ── Category Grid ── */

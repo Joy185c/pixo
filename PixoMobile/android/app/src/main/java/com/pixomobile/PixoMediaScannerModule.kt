@@ -10,6 +10,10 @@ import android.os.Build
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
+import android.graphics.Bitmap
+import android.util.Size
+import android.util.Base64
+import java.io.ByteArrayOutputStream
 import androidx.documentfile.provider.DocumentFile
 import com.facebook.react.bridge.*
 import java.util.UUID
@@ -72,6 +76,7 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
                 val sizeColumn = it.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
                 val dateModifiedColumn = it.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
                 
+                var thumbCount = 0
                 count = it.count
                 if (type == "photos") {
                     Log.d("PixoMediaScanner", "Images cursor count: $count")
@@ -101,6 +106,15 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
                     fileMap.putDouble("fileSize", size.toDouble())
                     fileMap.putString("category", type)
                     fileMap.putDouble("modifiedAt", dateModified.toDouble())
+
+                    // Generate thumbnail for the first 500 items to avoid OOM
+                    if (count <= 500 || thumbCount < 500) {
+                        val previewData = getThumbnailBase64(Uri.parse(contentUri), type, id)
+                        if (previewData != null) {
+                            fileMap.putString("previewData", previewData)
+                            thumbCount++
+                        }
+                    }
 
                     fileList.pushMap(fileMap)
                 }
@@ -208,5 +222,30 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
     private fun getMimeTypeFromExtension(name: String): String {
         val extension = MimeTypeMap.getFileExtensionFromUrl(name)
         return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase()) ?: "application/octet-stream"
+    }
+
+    private fun getThumbnailBase64(uri: Uri, type: String, id: Long): String? {
+        try {
+            val bitmap: Bitmap?
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                bitmap = reactApplicationContext.contentResolver.loadThumbnail(uri, Size(150, 150), null)
+            } else {
+                bitmap = if (type == "photos") {
+                    MediaStore.Images.Thumbnails.getThumbnail(reactApplicationContext.contentResolver, id, MediaStore.Images.Thumbnails.MINI_KIND, null)
+                } else {
+                    MediaStore.Video.Thumbnails.getThumbnail(reactApplicationContext.contentResolver, id, MediaStore.Video.Thumbnails.MINI_KIND, null)
+                }
+            }
+            if (bitmap != null) {
+                val outputStream = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 40, outputStream)
+                val bytes = outputStream.toByteArray()
+                bitmap.recycle()
+                return "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+            }
+        } catch (e: Exception) {
+            // Ignore thumbnail load failure
+        }
+        return null
     }
 }

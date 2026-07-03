@@ -77,10 +77,11 @@ export default function SelectedFilesReviewScreen({ navigation, route }: Props) 
         fileSize: f.size,
         category: f.category,
         modifiedAt: f.modifiedAt,
+        previewData: f.previewData
       }));
 
       // 3. Send metadata to backend in chunks
-      const CHUNK_SIZE = 500;
+      const CHUNK_SIZE = 250;
       let totalSaved = 0;
       console.log(`[Upload] SessionId: ${sessionId}`);
       console.log(`[Upload] Indexed files count before upload: ${payloadFiles.length}`);
