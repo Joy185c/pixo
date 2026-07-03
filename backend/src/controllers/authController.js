@@ -10,16 +10,19 @@ async function signup(req, res) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    const normalizedEmailOrUsername = emailOrUsername.trim().toLowerCase();
+    const normalizedAccessCode = accessCode.trim();
+
     try {
-        const { rows } = await pool.query('SELECT id FROM requester_users WHERE email_or_username = $1', [emailOrUsername]);
+        const { rows } = await pool.query('SELECT id FROM requester_users WHERE LOWER(email_or_username) = $1', [normalizedEmailOrUsername]);
         if (rows.length > 0) return res.status(400).json({ error: 'Username/Email already exists' });
 
-        const hash = await bcrypt.hash(accessCode, 10);
+        const hash = await bcrypt.hash(normalizedAccessCode, 10);
         
         const insertRes = await pool.query(
             `INSERT INTO requester_users (name, email_or_username, access_code_hash, role) 
              VALUES ($1, $2, $3, 'user') RETURNING id, name, email_or_username, role`,
-            [name, emailOrUsername, hash]
+            [name, normalizedEmailOrUsername, hash]
         );
         
         const user = insertRes.rows[0];
@@ -36,12 +39,15 @@ async function login(req, res) {
     const { emailOrUsername, accessCode } = req.body;
     if (!emailOrUsername || !accessCode) return res.status(400).json({ error: 'Missing required fields' });
 
+    const normalizedEmailOrUsername = emailOrUsername.trim().toLowerCase();
+    const normalizedAccessCode = accessCode.trim();
+
     try {
-        const { rows } = await pool.query('SELECT * FROM requester_users WHERE email_or_username = $1', [emailOrUsername]);
+        const { rows } = await pool.query('SELECT * FROM requester_users WHERE LOWER(email_or_username) = $1', [normalizedEmailOrUsername]);
         if (rows.length === 0) return res.status(401).json({ error: 'Invalid username or access code' });
 
         const user = rows[0];
-        const isMatch = await bcrypt.compare(accessCode, user.access_code_hash);
+        const isMatch = await bcrypt.compare(normalizedAccessCode, user.access_code_hash);
         if (!isMatch) return res.status(401).json({ error: 'Invalid username or access code' });
 
         const token = jwt.sign({ requesterUserId: user.id, emailOrUsername: user.email_or_username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });

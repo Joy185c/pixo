@@ -61,8 +61,10 @@ app.use((err, _req, res, _next) => {
     res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`[pixo] Backend running on http://localhost:${PORT}`);
+    const { syncSuperAdmin } = require('./utils/syncSuperAdmin');
+    await syncSuperAdmin();
 });
 
 module.exports = app;
