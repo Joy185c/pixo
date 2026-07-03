@@ -19,7 +19,7 @@ router.post('/resolve-invite', async (req, res) => {
                     il.connected_devices_count, il.expires_at,
                     ac.label AS access_code_label
              FROM   invite_links il
-             JOIN   access_codes ac ON ac.id = il.created_by_code_id
+             LEFT JOIN access_codes ac ON ac.id = il.created_by_code_id
              WHERE  il.token = $1`,
             [token]
         );
