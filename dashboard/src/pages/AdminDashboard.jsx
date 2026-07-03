@@ -195,7 +195,9 @@ function UserRow({ user, expanded }) {
       {/* Avatar */}
       <div style={{
         width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+        background: user.role === 'super_admin'
+          ? 'linear-gradient(135deg, #f59e0b, #ef4444)'
+          : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 18, fontWeight: 700, color: '#fff',
       }}>
@@ -204,8 +206,13 @@ function UserRow({ user, expanded }) {
 
       {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {user.name}
+        <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</span>
+          {user.role === 'super_admin' && (
+            <span style={{ fontSize: 10, fontWeight: 700, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', padding: '1px 7px', borderRadius: 5, flexShrink: 0 }}>
+              ADMIN
+            </span>
+          )}
         </div>
         <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{user.email_or_username}</div>
         {expanded && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, opacity: 0.6 }}>Joined {joinedDate}</div>}

@@ -5,6 +5,7 @@ const {
     getLinkDetails,
     getDeviceSession
 } = require('../controllers/dashboardController');
+const { getIndexedFiles } = require('../controllers/sharedFilesController');
 
 const { requireAuth, scopedRequesterAccess } = require('../middleware/authMiddleware');
 
@@ -19,5 +20,8 @@ router.get('/links/:token', requireAuth, scopedRequesterAccess, getLinkDetails);
 
 // GET /api/dashboard/sessions/:session_id  → Device session screen
 router.get('/sessions/:session_id', requireAuth, scopedRequesterAccess, getDeviceSession);
+
+// GET /api/dashboard/sessions/:session_id/files → File browser (LinkDetail DeviceFilesView)
+router.get('/sessions/:session_id/files', requireAuth, scopedRequesterAccess, getIndexedFiles);
 
 module.exports = router;

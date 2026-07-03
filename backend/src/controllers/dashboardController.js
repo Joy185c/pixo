@@ -54,7 +54,7 @@ async function getMyLinks(req, res) {
                 COUNT(ps.id) FILTER (WHERE ps.status = 'expired') AS expired_session_count,
                 COUNT(ps.id) FILTER (WHERE ps.status = 'revoked') AS revoked_session_count
             FROM  invite_links il
-            JOIN  access_codes ac ON ac.id = il.created_by_code_id
+            LEFT JOIN  access_codes ac ON ac.id = il.created_by_code_id
             LEFT JOIN provider_sessions ps ON ps.invite_id = il.id
             WHERE ($1::uuid IS NULL OR il.requester_user_id = $1::uuid)
             GROUP BY il.id, ac.label
@@ -84,7 +84,7 @@ async function getLinkDetails(req, res) {
         const { rows: linkRows } = await pool.query(
             `SELECT il.*, ac.label AS access_code_label
              FROM   invite_links il
-             JOIN   access_codes ac ON ac.id = il.created_by_code_id
+             LEFT JOIN   access_codes ac ON ac.id = il.created_by_code_id
              WHERE  il.token = $1 AND ($2::uuid IS NULL OR il.requester_user_id = $2::uuid)`,
             [token, req.scopedUserId]
         );

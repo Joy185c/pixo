@@ -24,6 +24,7 @@ async function getUsers(req, res) {
                 u.id,
                 u.name,
                 u.email_or_username,
+                u.role,
                 u.created_at,
                 (SELECT COUNT(*) FROM invite_links WHERE requester_user_id = u.id) AS total_links,
                 (SELECT COUNT(*) FROM provider_sessions WHERE requester_user_id = u.id) AS total_sessions,
