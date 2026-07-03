@@ -113,6 +113,9 @@ function Layout({ children, title, sub }) {
             <Server size={12} style={{ color: 'var(--muted)' }} />
             {user.name} ({user.role})
           </div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
+            Build: 6e313e3 (v2.0)
+          </div>
         </div>
       </aside>
 
