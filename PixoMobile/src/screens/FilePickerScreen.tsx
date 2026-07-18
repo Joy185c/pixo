@@ -125,8 +125,7 @@ export default function FilePickerScreen({ navigation, route }: Props) {
       type: f.mimeType,
       size: f.fileSize,
       category: f.category,
-      modifiedAt: f.modifiedAt,
-      previewData: f.previewData
+      modifiedAt: f.modifiedAt
     }));
 
     navigation.navigate('SelectedFilesReview', {

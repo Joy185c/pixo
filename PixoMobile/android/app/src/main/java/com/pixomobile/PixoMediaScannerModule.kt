@@ -107,12 +107,8 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
                     fileMap.putString("category", type)
                     fileMap.putDouble("modifiedAt", dateModified.toDouble())
 
-                    // Generate thumbnail for all items
-                    val previewData = getThumbnailBase64(Uri.parse(contentUri), type, id)
-                    if (previewData != null) {
-                        fileMap.putString("previewData", previewData)
-                    }
-
+                    // Thumbnail generation is removed from here for lazy loading.
+                    
                     fileList.pushMap(fileMap)
                 }
             }
@@ -225,7 +221,7 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
         try {
             val bitmap: Bitmap?
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                bitmap = reactApplicationContext.contentResolver.loadThumbnail(uri, Size(512, 512), null)
+                bitmap = reactApplicationContext.contentResolver.loadThumbnail(uri, Size(256, 256), null) // Optimize size
             } else {
                 bitmap = if (type == "photos") {
                     MediaStore.Images.Thumbnails.getThumbnail(reactApplicationContext.contentResolver, id, MediaStore.Images.Thumbnails.MINI_KIND, null)
@@ -235,7 +231,7 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
             }
             if (bitmap != null) {
                 val outputStream = ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 75, outputStream) // Reduced quality slightly for better memory footprint
                 val bytes = outputStream.toByteArray()
                 bitmap.recycle()
                 return "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
@@ -261,6 +257,33 @@ class PixoMediaScannerModule(reactContext: ReactApplicationContext) : ReactConte
             }
         } catch (e: Exception) {
             promise.reject("READ_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun getThumbnailsBatch(items: ReadableArray, promise: Promise) {
+        try {
+            val result = Arguments.createMap()
+            for (i in 0 until items.size()) {
+                val item = items.getMap(i)
+                val uriString = item?.getString("uri") ?: continue
+                val type = item.getString("type") ?: "documents"
+                val uri = Uri.parse(uriString)
+                
+                // Try to extract ID for MediaStore, fallback to 0
+                var id: Long = 0
+                try {
+                    id = uri.lastPathSegment?.toLong() ?: 0
+                } catch (e: Exception) {}
+
+                val previewData = getThumbnailBase64(uri, type, id)
+                if (previewData != null) {
+                    result.putString(uriString, previewData)
+                }
+            }
+            promise.resolve(result)
+        } catch (e: Exception) {
+            promise.reject("THUMBNAIL_BATCH_ERROR", e.message)
         }
     }
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, NativeModules } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../App';
@@ -12,7 +12,7 @@ type Props = {
   route: RouteProp<RootStackParamList, 'SelectedFilesReview'>;
 };
 
-// Base64 removed for automated indexing to save memory and performance
+const { PixoMediaScanner } = NativeModules;
 
 export default function SelectedFilesReviewScreen({ navigation, route }: Props) {
   const { token, permissions, files } = route.params;
@@ -88,8 +88,31 @@ export default function SelectedFilesReviewScreen({ navigation, route }: Props) 
       console.log(`[Upload] Indexed files count before upload: ${payloadFiles.length}`);
       console.log(`[Upload] Backend upload endpoint: /sessions/${sessionId}/files/index`);
 
+      // Load the URI mapping to fetch thumbnails lazily
+      const mapStr = await AsyncStorage.getItem(`pixo_mappings_${token}`);
+      const uriMap = mapStr ? JSON.parse(mapStr) : {};
+
       for (let i = 0; i < payloadFiles.length; i += CHUNK_SIZE) {
-        const chunk = payloadFiles.slice(i, i + CHUNK_SIZE);
+        let chunk = payloadFiles.slice(i, i + CHUNK_SIZE);
+        
+        // Lazy load thumbnails for this chunk
+        try {
+          const itemsToThumb = chunk.map(f => ({
+            uri: uriMap[f.fileToken],
+            type: f.category
+          })).filter(item => item.uri);
+          
+          if (itemsToThumb.length > 0) {
+            const thumbMap = await PixoMediaScanner.getThumbnailsBatch(itemsToThumb);
+            chunk = chunk.map(f => ({
+              ...f,
+              previewData: thumbMap[uriMap[f.fileToken]] || f.previewData || null
+            }));
+          }
+        } catch (thumbErr) {
+          console.warn("[Upload] Failed to generate some thumbnails for chunk:", thumbErr);
+        }
+
         try {
           const res = await apiClient.post(`/sessions/${sessionId}/files/index`, {
             files: chunk,
