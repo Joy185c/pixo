@@ -235,7 +235,7 @@ export default function ConnectPage() {
           <ExternalLink size={17}/> Open Pixo App
         </button>
         <a
-          href="https://github.com/Joy185c/pixo/releases/download/apk-latest/app-debug.apk"
+          href="https://github.com/Joy185c/pixo/releases/download/apk-latest/app-arm64-v8a-release.apk"
           download="pixo.apk"
           className="btn btn-ghost"
           style={{ justifyContent:'center', padding:14, gap:8, textDecoration:'none', display:'flex', alignItems:'center', color:'inherit', fontSize:13 }}
