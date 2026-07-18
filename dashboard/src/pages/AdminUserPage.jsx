@@ -214,8 +214,11 @@ function UserFileBrowser({ userId }) {
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
         <button className="btn btn-ghost btn-sm" onClick={() => {
+          const deleteUrl = selectedCat 
+            ? `/admin/users/${userId}/files?category=${selectedCat}` 
+            : `/admin/users/${userId}/files`;
           if (window.confirm("Are you sure you want to delete all files in this category for this user?")) {
-            api.delete(`/admin/users/${userId}/files`).then(() => {
+            api.delete(deleteUrl).then(() => {
               loadFiles(selectedCat, 0, false);
             }).catch(e => alert(e.response?.data?.error || 'Delete failed'));
           }

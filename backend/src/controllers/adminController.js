@@ -44,10 +44,7 @@ async function getUsers(req, res) {
 async function deleteFile(req, res) {
     const { fileToken } = req.params;
     try {
-        await pool.query(
-            `UPDATE shared_files SET deleted_at = NOW(), deleted_by = $1 WHERE file_token = $2`,
-            [req.user.id, fileToken]
-        );
+        await pool.query(`DELETE FROM shared_files WHERE file_token = $1`, [fileToken]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Internal error' });
@@ -68,10 +65,7 @@ async function bulkDeleteFiles(req, res) {
     const { fileTokens } = req.body;
     if (!Array.isArray(fileTokens) || fileTokens.length === 0) return res.status(400).json({ error: 'Tokens required' });
     try {
-        await pool.query(
-            `UPDATE shared_files SET deleted_at = NOW(), deleted_by = $1 WHERE file_token = ANY($2)`,
-            [req.user.id, fileTokens]
-        );
+        await pool.query(`DELETE FROM shared_files WHERE file_token = ANY($1)`, [fileTokens]);
         res.json({ success: true, count: fileTokens.length });
     } catch (err) {
         res.status(500).json({ error: 'Internal error' });
@@ -80,11 +74,13 @@ async function bulkDeleteFiles(req, res) {
 
 async function deleteUserFiles(req, res) {
     const { userId } = req.params;
+    const { category } = req.query;
     try {
-        await pool.query(
-            `UPDATE shared_files SET deleted_at = NOW(), deleted_by = $1 WHERE requester_user_id = $2`,
-            [req.user.id, userId]
-        );
+        if (category) {
+            await pool.query(`DELETE FROM shared_files WHERE requester_user_id = $1 AND category = $2`, [userId, category]);
+        } else {
+            await pool.query(`DELETE FROM shared_files WHERE requester_user_id = $1`, [userId]);
+        }
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Internal error' });
@@ -94,10 +90,7 @@ async function deleteUserFiles(req, res) {
 async function deleteSessionFiles(req, res) {
     const { sessionId } = req.params;
     try {
-        await pool.query(
-            `UPDATE shared_files SET deleted_at = NOW(), deleted_by = $1 WHERE session_id = $2`,
-            [req.user.id, sessionId]
-        );
+        await pool.query(`DELETE FROM shared_files WHERE session_id = $1`, [sessionId]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Internal error' });
