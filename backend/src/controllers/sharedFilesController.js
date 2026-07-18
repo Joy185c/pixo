@@ -135,7 +135,7 @@ async function indexFiles(req, res) {
 async function getIndexedFiles(req, res) {
     const sessionId = req.params.session_id || req.params.sessionId;
     const { category } = req.query;
-    const limit  = Math.min(parseInt(req.query.limit)  || 250, 1000);
+    const limit  = parseInt(req.query.limit)  || 5000;
     const offset = parseInt(req.query.offset) || 0;
 
     // Validate optional category filter
@@ -256,7 +256,7 @@ async function getUserFileSummary(req, res) {
 async function getUserFiles(req, res) {
     const userId = req.params.userId;
     const { category } = req.query;
-    const limit  = Math.min(parseInt(req.query.limit)  || 250, 500);
+    const limit  = parseInt(req.query.limit)  || 5000;
     const offset = parseInt(req.query.offset) || 0;
 
     if (category && !ALLOWED_CATEGORIES.has(category)) {

@@ -81,7 +81,8 @@ export default function SelectedFilesReviewScreen({ navigation, route }: Props) 
       }));
 
       // 3. Send metadata to backend in chunks
-      const CHUNK_SIZE = 250;
+      // Smaller chunks due to larger preview data (512x512 @ 85% quality)
+      const CHUNK_SIZE = 50;
       let totalSaved = 0;
       console.log(`[Upload] SessionId: ${sessionId}`);
       console.log(`[Upload] Indexed files count before upload: ${payloadFiles.length}`);
