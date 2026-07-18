@@ -238,7 +238,7 @@ function DeviceFilesView({ session, userId, onBack }) {
               onMouseEnter={e => e.currentTarget.style.transform='translateY(-2px)'}
               onMouseLeave={e => e.currentTarget.style.transform='translateY(0)'}
               onClick={() => setPreviewFile(file)}>
-              <div style={{ width:'100%', height:160, background:'#111', display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
+              <div style={{ width:'100%', height:160, background:'var(--bg3)', display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
                 {file.previewData || file.thumbnailUrl ? (
                   <img
                     src={file.thumbnailUrl || file.previewData}
@@ -306,10 +306,10 @@ function DeviceFilesView({ session, userId, onBack }) {
               <button className="btn btn-ghost btn-sm" onClick={() => setPreviewFile(null)}><X size={14}/></button>
             </div>
             {previewFile.mimeType?.startsWith('image/') ? (
-              <div style={{ background:'#0a0a14', borderRadius:10, overflow:'hidden', minHeight:200, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <div style={{ background:'var(--bg3)', borderRadius:10, overflow:'hidden', minHeight:200, display:'flex', alignItems:'center', justifyContent:'center' }}>
                 {previewFile.previewData || previewFile.thumbnailUrl
                   ? <img src={previewFile.thumbnailUrl || previewFile.previewData} alt={previewFile.fileName}
-                      style={{ width:'100%', height:'auto', maxHeight:400, objectFit:'contain' }} />
+                      style={{ width:'100%', height:'auto', maxHeight:400, objectFit:'contain', background: 'var(--bg2)' }} />
                   : <div style={{ textAlign:'center', color:'var(--muted)', padding:20 }}>
                       <Image size={48} style={{ marginBottom:12, opacity:0.3 }} />
                       <div style={{ fontSize:13 }}>Preview not available — download to view full image.</div>

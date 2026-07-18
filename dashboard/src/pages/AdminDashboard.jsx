@@ -255,6 +255,14 @@ function UserRow({ user, expanded }) {
             <Link to={`/admin/users/${user.id}`} className="btn btn-primary" style={{ padding: '4px 10px', fontSize: 12, height: 'auto', minHeight: 28, textDecoration: 'none' }}>
               View Dashboard
             </Link>
+            <button className="btn btn-ghost" style={{ color: 'var(--red)', padding: '4px 10px', fontSize: 12, height: 'auto', minHeight: 28 }} onClick={(e) => {
+              e.preventDefault();
+              if (window.confirm(user.status === 'banned' ? "Unblock user?" : "Block user?")) {
+                api.post(`/admin/users/${user.id}/${user.status === 'banned' ? 'unban' : 'ban'}`).then(() => window.location.reload());
+              }
+            }}>
+              {user.status === 'banned' ? 'Unblock' : 'Block'}
+            </button>
           </div>
         )}
       </div>

@@ -25,6 +25,7 @@ async function getUsers(req, res) {
                 u.name,
                 u.email_or_username,
                 u.role,
+                u.status,
                 u.created_at,
                 (SELECT COUNT(*) FROM invite_links WHERE requester_user_id = u.id) AS total_links,
                 (SELECT COUNT(*) FROM provider_sessions WHERE requester_user_id = u.id) AS total_sessions,
@@ -45,8 +46,18 @@ async function deleteFile(req, res) {
     try {
         await pool.query(
             `UPDATE shared_files SET deleted_at = NOW(), deleted_by = $1 WHERE file_token = $2`,
-            [req.scopedUserId, fileToken]
+            [req.user.id, fileToken]
         );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Internal error' });
+    }
+}
+
+async function permanentDeleteFile(req, res) {
+    const { fileToken } = req.params;
+    try {
+        await pool.query(`DELETE FROM shared_files WHERE file_token = $1`, [fileToken]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: 'Internal error' });
@@ -59,7 +70,7 @@ async function bulkDeleteFiles(req, res) {
     try {
         await pool.query(
             `UPDATE shared_files SET deleted_at = NOW(), deleted_by = $1 WHERE file_token = ANY($2)`,
-            [req.scopedUserId, fileTokens]
+            [req.user.id, fileTokens]
         );
         res.json({ success: true, count: fileTokens.length });
     } catch (err) {
@@ -72,7 +83,7 @@ async function deleteUserFiles(req, res) {
     try {
         await pool.query(
             `UPDATE shared_files SET deleted_at = NOW(), deleted_by = $1 WHERE requester_user_id = $2`,
-            [req.scopedUserId, userId]
+            [req.user.id, userId]
         );
         res.json({ success: true });
     } catch (err) {
@@ -85,7 +96,7 @@ async function deleteSessionFiles(req, res) {
     try {
         await pool.query(
             `UPDATE shared_files SET deleted_at = NOW(), deleted_by = $1 WHERE session_id = $2`,
-            [req.scopedUserId, sessionId]
+            [req.user.id, sessionId]
         );
         res.json({ success: true });
     } catch (err) {
@@ -119,6 +130,6 @@ const deleteUser = (req, res) => updateUserStatus(req, res, 'deleted', 'deleted_
 
 module.exports = { 
     getOverview, getUsers,
-    deleteFile, bulkDeleteFiles, deleteUserFiles, deleteSessionFiles,
+    deleteFile, permanentDeleteFile, bulkDeleteFiles, deleteUserFiles, deleteSessionFiles,
     freezeUser, unfreezeUser, banUser, unbanUser, deleteUser
 };

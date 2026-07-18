@@ -248,7 +248,7 @@ function UserFileBrowser({ userId }) {
                 onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                 onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                 onClick={() => setPreview(file)}>
-                <div style={{ width: '100%', height: 160, background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                <div style={{ width: '100%', height: 160, background: 'var(--bg3)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                   {file.previewData || file.thumbnailUrl
                     ? <img src={file.thumbnailUrl || file.previewData} alt={file.fileName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
                     : <FileIcon mime={file.mimeType} size={48} />}
@@ -311,7 +311,7 @@ function UserFileBrowser({ userId }) {
               <button className="btn btn-ghost btn-sm" onClick={() => setPreview(null)}>✕ Close</button>
             </div>
             {preview.previewData || preview.thumbnailUrl ? (
-              <img src={preview.thumbnailUrl || preview.previewData} alt={preview.fileName} style={{ width: '100%', borderRadius: 10, maxHeight: 400, objectFit: 'contain', background: '#000' }} />
+              <img src={preview.thumbnailUrl || preview.previewData} alt={preview.fileName} style={{ width: '100%', borderRadius: 10, maxHeight: 400, objectFit: 'contain', background: 'var(--bg2)' }} />
             ) : (
               <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
                 <FileIcon mime={preview.mimeType} size={48} />
@@ -323,9 +323,21 @@ function UserFileBrowser({ userId }) {
                 <span>Size: {fmtSize(preview.fileSize)}</span>
                 <span>Type: {preview.mimeType || '—'}</span>
               </div>
-              <button className="btn btn-primary btn-sm" onClick={() => handleDownload(preview)} disabled={downloading === preview.fileToken}>
-                {downloading === preview.fileToken ? 'Preparing...' : 'Download'}
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={() => {
+                  if (window.confirm("Permanently delete this file? This cannot be undone.")) {
+                    api.delete(`/admin/files/${preview.fileToken}/permanent`).then(() => {
+                      setPreview(null);
+                      loadFiles(selectedCat, 0, false);
+                    }).catch(e => alert(e.response?.data?.error || 'Failed to delete'));
+                  }
+                }}>
+                  Permanently Delete
+                </button>
+                <button className="btn btn-primary btn-sm" onClick={() => handleDownload(preview)} disabled={downloading === preview.fileToken}>
+                  {downloading === preview.fileToken ? 'Preparing...' : 'Download'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -549,9 +561,9 @@ export default function AdminUserPage() {
               {user.status === 'frozen' ? 'Unfreeze' : 'Freeze'}
             </button>
             <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={() => {
-              if (window.confirm("Ban user?")) api.post(`/admin/users/${userId}/${user.status === 'banned' ? 'unban' : 'ban'}`).then(() => window.location.reload());
+              if (window.confirm("Block user?")) api.post(`/admin/users/${userId}/${user.status === 'banned' ? 'unban' : 'ban'}`).then(() => window.location.reload());
             }}>
-              {user.status === 'banned' ? 'Unban' : 'Ban'}
+              {user.status === 'banned' ? 'Unblock' : 'Block'}
             </button>
             <button className="btn btn-primary btn-sm" style={{ background: 'var(--red)' }} onClick={() => {
               if (window.confirm("Delete user permanently? This will soft delete their data.")) api.delete(`/admin/users/${userId}`).then(() => navigate('/admin/users'));

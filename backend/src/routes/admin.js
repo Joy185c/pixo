@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const { 
     getOverview, getUsers,
-    deleteFile, bulkDeleteFiles, deleteUserFiles, deleteSessionFiles,
+    deleteFile, permanentDeleteFile, bulkDeleteFiles, deleteUserFiles, deleteSessionFiles,
     freezeUser, unfreezeUser, banUser, unbanUser, deleteUser 
 } = require('../controllers/adminController');
 const { getMyLinks, getDashboardSummary, getLinkDetails } = require('../controllers/dashboardController');
@@ -21,6 +21,7 @@ router.get('/files/summary', getUserFileSummary);
 
 // ── File Delete routes ─────────────────────────────────────────
 router.delete('/files/:fileToken', deleteFile);
+router.delete('/files/:fileToken/permanent', permanentDeleteFile);
 router.post('/files/bulk-delete', bulkDeleteFiles);
 router.delete('/users/:userId/files', deleteUserFiles);
 router.delete('/sessions/:sessionId/files', deleteSessionFiles);
