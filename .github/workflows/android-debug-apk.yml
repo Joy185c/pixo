@@ -48,6 +48,29 @@ jobs:
         working-directory: ./PixoMobile/android
         run: chmod +x ./gradlew
 
+      # ── FIX: Add extra Maven repos via init.gradle to resolve java-diff-utils 403 error ──
+      - name: Configure Gradle init script with extra repositories
+        run: |
+          mkdir -p ~/.gradle
+          cat > ~/.gradle/init.gradle << 'EOF'
+          allprojects {
+            buildscript {
+              repositories {
+                maven { url "https://jitpack.io" }
+                maven { url "https://plugins.gradle.org/m2/" }
+                mavenCentral()
+                google()
+              }
+            }
+            repositories {
+              maven { url "https://jitpack.io" }
+              maven { url "https://plugins.gradle.org/m2/" }
+              mavenCentral()
+              google()
+            }
+          }
+          EOF
+
       # ── KEY FIX: Bundle JS into the APK so Metro is not needed ──
       - name: Create Android assets directory
         run: mkdir -p PixoMobile/android/app/src/main/assets
